@@ -25,7 +25,6 @@ int main()
     InitPhysics((Vector2){ 0.0f, -9.81f });
     
     PhysicBody rectangle = CreatePhysicBody((Vector2){ screenWidth/2, screenHeight/2 });
-    PhysicBody rectangle2 = CreatePhysicBody((Vector2){ screenWidth/2, screenHeight/2 });
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -44,7 +43,7 @@ int main()
 
             ClearBackground(RAYWHITE);
             
-            // TODO: draw physic shapes
+            DrawPhysicBodies(true);
             
             DrawPhysicsInfo();
             

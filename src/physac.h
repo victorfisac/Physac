@@ -100,6 +100,8 @@ PHYSACDEF void InitPhysics(Vector2 gravity);            // Initializes physics v
 PHYSACDEF PhysicBody CreatePhysicBody(Vector2 pos);     // Creates a new physic body with generic parameters
 void DestroyPhysicBody(PhysicBody body);                // Unitializes and destroy a physic body
 
+PHYSACDEF void DrawPhysicBodies();                      // Draw all created physic bodies shapes
+
 PHYSACDEF void ClosePhysics(void);                      // Unitializes physics pointers and closes physics loop thread
 
 #endif // PHYSAC_H
@@ -261,6 +263,15 @@ void DestroyPhysicBody(PhysicBody body)
     else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced body");
 }
 
+// Draw all created physic bodies shapes
+PHYSACDEF void DrawPhysicBodies()
+{
+    for (int i = 0; i < physicBodiesCount; i++)
+    {
+        DrawCircleV(bodies[i]->position, 20, RED);
+    }
+}
+
 // Unitializes physics pointers and exits physics loop thread
 PHYSACDEF void ClosePhysics(void)
 {
@@ -307,7 +318,7 @@ static void *PhysicsLoop(void *arg)
         startTime = currentTime;
         
         // TODO: test static delta time (1.0/60.0) and then implement current fps based delta time
-        while (accumulator >= STATIC_DELTATIME)
+        while (accumulator >= deltaTime)
         {
             if (!frameStepping) PhysicsStep();
             else
@@ -319,8 +330,10 @@ static void *PhysicsLoop(void *arg)
                 }
             }
             
-            accumulator -= STATIC_DELTATIME;
+            accumulator -= deltaTime;
         }
+        
+        const double alpha = accumulator/deltaTime;
     }
     
     return NULL;
@@ -330,6 +343,11 @@ static void *PhysicsLoop(void *arg)
 static void PhysicsStep(void)
 {
     stepsCount++;
+    
+    for (int i = 0; i < physicBodiesCount; i++)
+    {
+        bodies[i]->position.x += deltaTime/10;
+    }
     
     // TODO: calculate delta time
     
