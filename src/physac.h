@@ -128,6 +128,7 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 static bool frameStepping = false;              // TODO: check variable utility
 static bool canStep = false;                    // TODO: check variable utility
 static bool physicsThreadEnabled = false;       // Physics thread enabled state
+static double accumulator;                      // Physics time step delta time accumulator
 static int stepsCount = 0;                      // Total physics steps processed
 
 static double currentTime = 0;                  // Current time in milliseconds
@@ -145,6 +146,7 @@ static void PhysicsStep(void);                  // Physics steps calculations (d
 static double GetCurrentTime(void);             // Get current time in milliseconds
 
 static void MathClamp(double *value, double min, double max);       // Clamp a value in a range
+static void DrawPhysicsInfo(void);                                  // Draw debug information about physics states and values
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -189,7 +191,7 @@ static void *PhysicsLoop(void *arg)
     
     // Initialize physics loop thread values
     physicsThreadEnabled = true;
-    double accumulator = 0;
+    accumulator = 0;
     
     // Initialize high resolution timer
     startTime = GetCurrentTime();
@@ -270,6 +272,12 @@ static void MathClamp(double *value, double min, double max)
 {
     if (*value < min) *value = min;
     else if (*value > max) *value = max;
+}
+
+// Draw debug information about physics states and values
+static void DrawPhysicsInfo(void)
+{
+    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, BLACK);
 }
 
 #endif  // PHYSAC_IMPLEMENTATION

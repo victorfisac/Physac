@@ -43,9 +43,7 @@ int main()
             
             // TODO: draw physic shapes
             
-            DrawText(FormatText("Steps: %i", stepsCount), 10, 40, 20, BLACK);
-
-            DrawFPS(10, 10);
+            DrawPhysicsInfo();
             
         EndDrawing();
         //----------------------------------------------------------------------------------
