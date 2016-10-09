@@ -20,9 +20,12 @@ int main()
     int screenHeight = 450;
 
     InitWindow(screenWidth, screenHeight, "raylib [physac] - demo");
-    InitPhysics((Vector2){ 0.0f, -9.81f/2 });
-    
     SetTargetFPS(60);
+    
+    InitPhysics((Vector2){ 0.0f, -9.81f });
+    
+    PhysicBody rectangle = CreatePhysicBody((Vector2){ screenWidth/2, screenHeight/2 });
+    PhysicBody rectangle2 = CreatePhysicBody((Vector2){ screenWidth/2, screenHeight/2 });
     //--------------------------------------------------------------------------------------
 
     // Main game loop
