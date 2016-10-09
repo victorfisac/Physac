@@ -30,8 +30,8 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------        
-        
-        // TODO: update your variables here
+        if (IsKeyPressed('F')) frameStepping = !frameStepping;
+        if (IsKeyPressed(' ')) canStep = true;
         
         //----------------------------------------------------------------------------------
 
@@ -42,6 +42,8 @@ int main()
             ClearBackground(RAYWHITE);
             
             // TODO: draw physic shapes
+            
+            DrawText(FormatText("Steps: %i", stepsCount), 10, 40, 20, BLACK);
 
             DrawFPS(10, 10);
             

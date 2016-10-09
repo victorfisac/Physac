@@ -73,6 +73,7 @@
 // Defines and Macros
 //----------------------------------------------------------------------------------
 #define     PHYSAC_COLLISION_INTERATIONS    10
+#define     MAX_TIMESTEP                    0.02
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -88,7 +89,7 @@
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 PHYSACDEF void InitPhysics(Vector2 gravity);            // Initializes physics values, pointers and creates physics loop thread
-PHYSACDEF void ClosePhysics();                          // Unitializes physics pointers and closes physics loop thread
+PHYSACDEF void ClosePhysics(void);                      // Unitializes physics pointers and closes physics loop thread
 
 #endif // PHYSAC_H
 
@@ -104,13 +105,17 @@ PHYSACDEF void ClosePhysics();                          // Unitializes physics p
     #include <pthread.h>        // Required for: pthread_t, pthread_create()
 #endif
 
-#include <stdio.h>              // Required for: printf(), stdout
-#include "C:\raylib\raylib\src\utils.h"
+#include <math.h>               // Required for: clamp()
+#include "C:\raylib\raylib\src\utils.h"     // Required for: TraceLog()
+
+// Functions required to query time on Windows
+int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
+int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-// TODO: add internal defines
+#define     STATIC_DELTATIME        1.0/60.0
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -120,17 +125,26 @@ PHYSACDEF void ClosePhysics();                          // Unitializes physics p
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-static bool frameStepping = false;          // TODO: check variable utility
-static bool canStep = false;                // TODO: check variable utility
-static bool physicsThreadEnabled = false;   // Physics thread enabled state
+static bool frameStepping = false;              // TODO: check variable utility
+static bool canStep = false;                    // TODO: check variable utility
+static bool physicsThreadEnabled = false;       // Physics thread enabled state
+static int stepsCount = 0;                      // Total physics steps processed
 
-static Vector2 gravityForce = { 0, 0 };     // Physics world gravity force
-static int physicBodiesCount = 0;           // Physics world current bodies counter
+static double currentTime = 0;                  // Current time in milliseconds
+static double startTime = 0;                    // start time in milliseconds
+
+static Vector2 gravityForce = { 0, 0 };         // Physics world gravity force
+static int physicBodiesCount = 0;               // Physics world current bodies counter
 
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static void *PhysicsLoop(void *arg);        // Physics loop thread function
+static void *PhysicsLoop(void *arg);            // Physics loop thread function
+static void PhysicsStep(void);                  // Physics steps calculations (dynamics, collisions and position corrections)
+
+static double GetCurrentTime(void);             // Get current time in milliseconds
+
+static void MathClamp(double *value, double min, double max);       // Clamp a value in a range
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -149,10 +163,12 @@ PHYSACDEF void InitPhysics(Vector2 gravity)
         pthread_t tid;
         pthread_create(&tid, NULL, &PhysicsLoop, NULL);
     #endif
+    
+    // TODO: initialize dynamic memory allocations
 }
 
 // Unitializes physics pointers and exits physics loop thread
-PHYSACDEF void ClosePhysics()
+PHYSACDEF void ClosePhysics(void)
 {
     TraceLog(WARNING, "[PHYSAC] physics module closed successfully");
     
@@ -171,24 +187,89 @@ static void *PhysicsLoop(void *arg)
 {
     TraceLog(WARNING, "[PHYSAC] physics thread created with successfully");
     
-    // Initialize physics loop thread state
+    // Initialize physics loop thread values
     physicsThreadEnabled = true;
+    double accumulator = 0;
     
-    // TODO: initialize high resolution timer
+    // Initialize high resolution timer
+    startTime = GetCurrentTime();
     
     // Physics update loop
     while (physicsThreadEnabled)
     {
-        // TODO: delta time logic
+        // Calculate current time
+        currentTime = GetCurrentTime();
         
-        // TODO: update dynamics
+        // Store the time elapsed since the last frame began
+        accumulator += currentTime - startTime;
         
-        // TODO: update collisions
+        // Clamp accumulator to max time step to avoid bad performance
+        MathClamp(&accumulator, 0.0, MAX_TIMESTEP);
         
-        // TODO: other updates
+        // Record the starting of this frame
+        startTime = currentTime;
+        
+        // TODO: test static delta time (1.0/60.0) and then implement current fps based delta time
+        while (accumulator >= STATIC_DELTATIME)
+        {
+            if (!frameStepping) PhysicsStep();
+            else
+            {
+                if (canStep)
+                {
+                    PhysicsStep();
+                    canStep = false;
+                }
+            }
+            
+            accumulator -= STATIC_DELTATIME;
+        }
     }
     
     return NULL;
+}
+
+// Physics steps calculations (dynamics, collisions and position corrections)
+static void PhysicsStep(void)
+{
+    stepsCount++;
+    
+    // TODO: calculate delta time
+    
+    // TODO: update dynamics
+    
+    // TODO: update collisions
+    
+    // TODO: other updates
+    
+    // TODO: test rendering interpolation for smooth rendering results
+}
+
+// Get current time in milliseconds
+static double GetCurrentTime(void)
+{
+    double time = 0;
+    
+    unsigned long long int clockFrequency, currentTime;
+    
+    QueryPerformanceFrequency(&clockFrequency);
+    QueryPerformanceCounter(&currentTime);
+    
+    // TraceLog(INFO, "currentTime: %f", (double)currentTime);
+    // TraceLog(INFO, "clockFrequency: %i", clockFrequency);
+    
+    time = (double)((double)currentTime/clockFrequency)*1000;
+    
+    // TraceLog(INFO, "time: %f", time);
+
+    return time;
+}
+
+// Clamp a value in a range
+static void MathClamp(double *value, double min, double max)
+{
+    if (*value < min) *value = min;
+    else if (*value > max) *value = max;
 }
 
 #endif  // PHYSAC_IMPLEMENTATION
