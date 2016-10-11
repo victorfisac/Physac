@@ -74,7 +74,8 @@
 //----------------------------------------------------------------------------------
 #define     COLLISION_INTERATIONS           10
 #define     MAX_TIMESTEP                    0.02
-#define     MAX_PHYSIC_BODIES               2
+#define     MAX_PHYSICS_BODIES              256
+#define     MAX_PHYSICS_MANIFOLDS           256
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
 
@@ -86,23 +87,28 @@
     // TODO: add standalone type structs
 #endif
 
-typedef struct PhysicBodyData {
+typedef struct PhysicsBodyData {
     unsigned int id;
     unsigned int index;
     Vector2 position;
-} PhysicBodyData, *PhysicBody;
+    
+    float inertia;              // Moment of inertia
+    float inverseInertia;       // Inverse value of inertia
+    float mass;                 // Physics body mass
+    float inverseMass;          // Inverse value of mass
+} PhysicsBodyData, *PhysicsBody;
 
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
-PHYSACDEF void InitPhysics(Vector2 gravity);            // Initializes physics values, pointers and creates physics loop thread
+PHYSACDEF void InitPhysics(Vector2 gravity);                        // Initializes physics values, pointers and creates physics loop thread
 
-PHYSACDEF PhysicBody CreatePhysicBody(Vector2 pos);     // Creates a new physic body with generic parameters
-void DestroyPhysicBody(PhysicBody body);                // Unitializes and destroy a physic body
+PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float mass);   // Creates a new physics body with generic parameters
+void DestroyPhysicsBody(PhysicsBody body);                          // Unitializes and destroy a physics body
 
-PHYSACDEF void DrawPhysicBodies();                      // Draw all created physic bodies shapes
+PHYSACDEF void DrawPhysicsBodies();                                 // Draw all created physics physics bodies shapes
 
-PHYSACDEF void ClosePhysics(void);                      // Unitializes physics pointers and closes physics loop thread
+PHYSACDEF void ClosePhysics(void);                                  // Unitializes physics pointers and closes physics loop thread
 
 #endif // PHYSAC_H
 
@@ -134,37 +140,56 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
-// TODO: add internal structs
+typedef struct PhysicsManifoldData {
+    int id;
+    int index;
+    PhysicsBody bodyA;
+    PhysicsBody bodyB;
+    float penetration;      // Depth of penetration from collision
+    Vector2 normal;         // Normal direction vector from 'a' to 'b'
+    Vector2 contacts[2];    // Points of contact during collision
+    int contactsCount;      // Current collision number of contacts
+    float e;                // Mixed restitution during collision
+    float df;               // Mixed dynamic friction during collision
+    float sf;               // Mixed static friction during collision
+} PhysicsManifoldData, *PhysicsManifold;
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-static bool frameStepping = false;              // TODO: check variable utility
-static bool canStep = false;                    // TODO: check variable utility
-static bool physicsThreadEnabled = false;       // Physics thread enabled state
-static double accumulator;                      // Physics time step delta time accumulator
-static int stepsCount = 0;                      // Total physics steps processed
+static bool frameStepping = false;                          // Physics frame stepping state
+static bool canStep = false;                                // Physics frame stepping input state
+static bool physicsThreadEnabled = false;                   // Physics thread enabled state
 
-static double currentTime = 0;                  // Current time in milliseconds
-static double startTime = 0;                    // Start time in milliseconds
-static double deltaTime = STATIC_DELTATIME;     // Delta time used for physics steps
+static double currentTime = 0;                              // Current time in milliseconds
+static double startTime = 0;                                // Start time in milliseconds
+static double deltaTime = STATIC_DELTATIME;                 // Delta time used for physics steps
+static double accumulator = 0;                              // Physics time step delta time accumulator
 
-static Vector2 gravityForce = { 0, 0 };         // Physics world gravity force
+static int stepsCount = 0;                                  // Total physics steps processed
+static Vector2 gravityForce = { 0, 0 };                     // Physics world gravity force
 
-static PhysicBody bodies[MAX_PHYSIC_BODIES];    // Physics bodies pointers array
-static int physicBodiesCount = 0;               // Physics world current bodies counter
+static PhysicsBody bodies[MAX_PHYSICS_BODIES];              // Physics bodies pointers array
+static int physicsBodiesCount = 0;                          // Physics world current bodies counter
 
-static int usedMemory = 0;                      // Total allocated dynamic memory
+static PhysicsManifold contacts[MAX_PHYSICS_MANIFOLDS];     // Physics bodies pointers array
+static int physicsManifoldsCount = 0;                       // Physics world current manifolds counter
+
+static int usedMemory = 0;                                  // Total allocated dynamic memory
 
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static void *PhysicsLoop(void *arg);            // Physics loop thread function
-static void PhysicsStep(void);                  // Physics steps calculations (dynamics, collisions and position corrections)
+static void *PhysicsLoop(void *arg);                                                // Physics loop thread function
+static void PhysicsStep(void);                                                      // Physics steps calculations (dynamics, collisions and position corrections)
 
-static double GetCurrentTime(void);             // Get current time in milliseconds
-static void MathClamp(double *value, double min, double max);       // Clamp a value in a range
-static void DrawPhysicsInfo(void);                                  // Draw debug information about physics states and values
+static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b);         // Creates a new physics manifold to solve collision
+static void DestroyPhysicsManifold(PhysicsManifold manifold);                       // Unitializes and destroys a physics manifold
+void SolvePhysicsManifold(PhysicsManifold manifold);                                // Solves a created physics manifold between two physics bodies
+
+static double GetCurrentTime(void);                                                 // Get current time in milliseconds
+static void MathClamp(double *value, double min, double max);                       // Clamp a value in a range
+static void DrawPhysicsInfo(void);                                                  // Draw debug information about physics states and values
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -185,19 +210,19 @@ PHYSACDEF void InitPhysics(Vector2 gravity)
     #endif
 }
 
-// Creates a new physic body with generic parameters
-PhysicBody CreatePhysicBody(Vector2 pos)
+// Creates a new physics body with generic parameters
+PhysicsBody CreatePhysicsBody(Vector2 pos, float mass)
 {
-    PhysicBody newBody = (PhysicBody)PHYSAC_MALLOC(sizeof(PhysicBodyData));
-    usedMemory += sizeof(PhysicBodyData);
+    PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
+    usedMemory += sizeof(PhysicsBodyData);
     
     int newId = -1;
-    for (int i = 0; i < MAX_PHYSIC_BODIES; i++)
+    for (int i = 0; i < MAX_PHYSICS_BODIES; i++)
     {
         int currentId = i;
         
-        // Check if current id already exist in other physic body
-        for (int k = 0; k < physicBodiesCount; k++)
+        // Check if current id already exist in other physics body
+        for (int k = 0; k < physicsBodiesCount; k++)
         {
             if (bodies[k]->id == currentId)
             {
@@ -206,7 +231,7 @@ PhysicBody CreatePhysicBody(Vector2 pos)
             }
         }
         
-        // If it is not used, use it as new physic body id
+        // If it is not used, use it as new physics body id
         if (currentId == i)
         {
             newId = i;
@@ -218,22 +243,27 @@ PhysicBody CreatePhysicBody(Vector2 pos)
     {
         // Initialize new body with generic values
         newBody->id = newId;
-        newBody->index = physicBodiesCount;
+        newBody->index = physicsBodiesCount;
         newBody->position = pos;
         
-        // Add new body to bodies pointers array and update bodies count
-        bodies[physicBodiesCount] = newBody;
-        physicBodiesCount++;
+        newBody->inertia = 0;
+        newBody->inverseInertia = 0;
+        newBody->mass = mass;
+        newBody->inverseMass = 1/mass;
         
-        TraceLog(WARNING, "[PHYSAC] created physic body id %i (index: %i) [USED RAM: %i bytes]", newBody->id, newBody->index, usedMemory);
+        // Add new body to bodies pointers array and update bodies count
+        bodies[physicsBodiesCount] = newBody;
+        physicsBodiesCount++;
+        
+        TraceLog(WARNING, "[PHYSAC] created physics body id %i (index: %i) [USED RAM: %i bytes]", newBody->id, newBody->index, usedMemory);
     }
-    else TraceLog(ERROR, "[PHYSAC] new physic body creation failed because there is any available id to use");
+    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
     
     return newBody;
 }
 
-// Unitializes and destroy a physic body
-void DestroyPhysicBody(PhysicBody body)
+// Unitializes and destroys a physics body
+void DestroyPhysicsBody(PhysicsBody body)
 {
     if (body != NULL)
     {
@@ -242,13 +272,13 @@ void DestroyPhysicBody(PhysicBody body)
         
         // Free body allocated memory
         PHYSAC_FREE(bodies[index]);
-        usedMemory -= sizeof(PhysicBodyData);
+        usedMemory -= sizeof(PhysicsBodyData);
         bodies[index] = NULL;
         
         // Reorder physics bodies pointers array and its catched index
-        for (int i = index; i < physicBodiesCount; i++)
+        for (int i = index; i < physicsBodiesCount; i++)
         {
-            if ((i + 1) < physicBodiesCount)
+            if ((i + 1) < physicsBodiesCount)
             {
                 bodies[i] = bodies[i + 1];
                 bodies[i]->index = i;
@@ -256,17 +286,17 @@ void DestroyPhysicBody(PhysicBody body)
         }
         
         // Update physics bodies count
-        physicBodiesCount--;
+        physicsBodiesCount--;
         
-        TraceLog(WARNING, "[PHYSAC] destroyed physic body id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
+        TraceLog(WARNING, "[PHYSAC] destroyed physics body id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
     }
     else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced body");
 }
 
-// Draw all created physic bodies shapes
-PHYSACDEF void DrawPhysicBodies()
+// Draw all created physics bodies shapes
+PHYSACDEF void DrawPhysicsBodies()
 {
-    for (int i = 0; i < physicBodiesCount; i++)
+    for (int i = 0; i < physicsBodiesCount; i++)
     {
         DrawCircleV(bodies[i]->position, 20, RED);
     }
@@ -278,18 +308,22 @@ PHYSACDEF void ClosePhysics(void)
     // Exit physics loop thread
     physicsThreadEnabled = false;
     
-    // Unitialize dynamic memory allocations
-    int currentCount = physicBodiesCount;
-    for (int i = 0; i < currentCount; i++) DestroyPhysicBody(bodies[i]);
+    // Unitialize physics bodies dynamic memory allocations
+    int currentCount = physicsBodiesCount;
+    for (int i = 0; i < currentCount; i++) DestroyPhysicsBody(bodies[i]);
     
-    if (physicBodiesCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated bodies [USED RAM: %i bytes]", physicBodiesCount, usedMemory);
+    // Unitialize physics manifolds dynamic memory allocations
+    currentCount = physicsManifoldsCount;
+    for (int i = 0; i < currentCount; i++) DestroyPhysicsManifold(contacts[i]);
+    
+    if (physicsBodiesCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated bodies [USED RAM: %i bytes]", physicsBodiesCount, usedMemory);
+    else if (physicsManifoldsCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated manifolds [USED RAM: %i bytes]", physicsManifoldsCount, usedMemory);
     else TraceLog(WARNING, "[PHYSAC] physics module closed successfully");
 }
 
 //----------------------------------------------------------------------------------
 // Module Internal Functions Definition
 //----------------------------------------------------------------------------------
-
 // Physics loop thread function
 static void *PhysicsLoop(void *arg)
 {
@@ -344,10 +378,38 @@ static void PhysicsStep(void)
 {
     stepsCount++;
     
-    for (int i = 0; i < physicBodiesCount; i++)
+    // Clear previous generated collisions information
+    int currentCount = physicsManifoldsCount;
+    for (int i = 0; i < currentCount; i++) DestroyPhysicsManifold(contacts[i]);
+    
+    // Generate new collision information
+    for (int i = 0; i < physicsBodiesCount; i++)
+    {
+        PhysicsBody A = bodies[i];
+        
+        for (int j = i + 1; j < physicsBodiesCount; j++)
+        {
+            PhysicsBody B = bodies[j];
+            
+            if ((A->inverseMass == 0) && (B->inverseMass == 0)) continue;
+            
+            PhysicsManifold manifold = CreatePhysicsManifold(A, B);
+            SolvePhysicsManifold(manifold);
+            
+            if (manifold->contactsCount > 0)
+            {
+                // TODO: contact emplace_back
+            }
+        }
+    }
+    
+    // Auxiliar code
+    for (int i = 0; i < physicsBodiesCount; i++)
     {
         bodies[i]->position.x += deltaTime/10;
     }
+    
+    // TODO: continue here with manifolds
     
     // TODO: calculate delta time
     
@@ -358,6 +420,99 @@ static void PhysicsStep(void)
     // TODO: other updates
     
     // TODO: test rendering interpolation for smooth rendering results
+}
+
+// Creates a new physics manifold to solve collision
+static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
+{
+    PhysicsManifold newManifold = (PhysicsManifold)PHYSAC_MALLOC(sizeof(PhysicsManifold));
+    usedMemory += sizeof(PhysicsManifold);
+    
+    int newId = -1;
+    for (int i = 0; i < MAX_PHYSICS_MANIFOLDS; i++)
+    {
+        int currentId = i;
+        
+        // Check if current id already exist in other physics body
+        for (int k = 0; k < physicsManifoldsCount; k++)
+        {
+            if (contacts[k]->id == currentId)
+            {
+                currentId++;
+                break;
+            }
+        }
+        
+        // If it is not used, use it as new physics body id
+        if (currentId == i)
+        {
+            newId = i;
+            break;
+        }
+    }
+    
+    if (newId != -1)
+    {    
+        // Initialize new manifold with generic values
+        newManifold->id = newId;
+        newManifold->index = physicsManifoldsCount;
+        newManifold->bodyA = a;
+        newManifold->bodyB = b;
+        newManifold->penetration = 0;
+        newManifold->normal = (Vector2){ 0, 0 };
+        newManifold->contacts[0] = (Vector2){ 0, 0 };
+        newManifold->contacts[1] = (Vector2){ 0, 0 };
+        newManifold->contactsCount = 0;
+        newManifold->e = 0;
+        newManifold->df = 0;
+        newManifold->sf = 0;
+        
+        // Add new body to bodies pointers array and update bodies count
+        contacts[physicsManifoldsCount] = newManifold;
+        physicsManifoldsCount++;
+        
+        TraceLog(WARNING, "[PHYSAC] created physics manifold id %i (index: %i) with physics bodies id %i and %i [USED RAM: %i bytes]", newManifold->id, newManifold->index, newManifold->bodyA->id, newManifold->bodyB->id, usedMemory);
+    }
+    else TraceLog(ERROR, "[PHYSAC] new physics manifold creation failed because there is any available id to use");
+    
+    return newManifold;
+}
+
+// Unitializes and destroys a physics manifold
+static void DestroyPhysicsManifold(PhysicsManifold manifold)
+{
+    if (manifold != NULL)
+    {
+        int id = manifold->id;
+        int index = manifold->index;
+        
+        // Free manifold allocated memory
+        PHYSAC_FREE(contacts[index]);
+        usedMemory -= sizeof(PhysicsManifold);
+        contacts[index] = NULL;
+        
+        // Reorder physics manifolds pointers array and its catched index
+        for (int i = index; i < physicsManifoldsCount; i++)
+        {
+            if ((i + 1) < physicsBodiesCount)
+            {
+                contacts[i] = contacts[i + 1];
+                contacts[i]->index = i;
+            }
+        }
+        
+        // Update physics manifolds count
+        physicsManifoldsCount--;
+        
+        TraceLog(WARNING, "[PHYSAC] destroyed physics manifold id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
+    }
+    else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced manifold");
+}
+
+// Solves a created physics manifold between two physics bodies
+void SolvePhysicsManifold(PhysicsManifold manifold)
+{
+    // TODO: solve collision manifold
 }
 
 // Get current time in milliseconds

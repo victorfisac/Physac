@@ -22,9 +22,9 @@ int main()
     InitWindow(screenWidth, screenHeight, "raylib [physac] - demo");
     SetTargetFPS(60);
     
-    InitPhysics((Vector2){ 0.0f, -9.81f });
+    InitPhysics((Vector2){ 0.0f, -9.81f });     // TODO: check if real world gravity value gives good results
     
-    PhysicBody rectangle = CreatePhysicBody((Vector2){ screenWidth/2, screenHeight/2 });
+    PhysicsBody rectangle = CreatePhysicsBody((Vector2){ screenWidth/2, screenHeight/2 }, 1);
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -33,7 +33,7 @@ int main()
         // Update
         //----------------------------------------------------------------------------------        
         if (IsKeyPressed('F')) frameStepping = !frameStepping;
-        if (IsKeyPressed(' ')) canStep = true;
+        if (IsKeyDown(' ')) canStep = true;
         
         //----------------------------------------------------------------------------------
 
@@ -43,7 +43,7 @@ int main()
 
             ClearBackground(RAYWHITE);
             
-            DrawPhysicBodies(true);
+            DrawPhysicsBodies(true);
             
             DrawPhysicsInfo();
             
