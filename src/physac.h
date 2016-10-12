@@ -84,8 +84,22 @@
 // NOTE: Below types are required for PHYSAC_STANDALONE usage
 //----------------------------------------------------------------------------------
 #if defined(PHYSAC_STANDALONE)
-    // TODO: add standalone type structs
+    typedef struct Vector2 {
+        float x;
+        float y;
+    } Vector2;
 #endif
+
+typedef enum PhysicsShapeType { PHYSICS_CIRCLE, PHYSICS_POLYGON } PhysicsShapeType;
+
+// Previously defined to be used in PhysicsShape struct as circular dependencies
+typedef struct PhysicsBodyData *PhysicsBody;
+
+typedef struct PhysicsShape {
+    PhysicsShapeType type;
+    PhysicsBody body;
+    float radius;               // Used for circle shapes
+} PhysicsShape;
 
 typedef struct PhysicsBodyData {
     unsigned int id;
@@ -102,7 +116,9 @@ typedef struct PhysicsBodyData {
     float inverseInertia;       // Inverse value of inertia
     float mass;                 // Physics body mass
     float inverseMass;          // Inverse value of mass
-} PhysicsBodyData, *PhysicsBody;
+    
+    PhysicsShape shape;
+} PhysicsBodyData;
 
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
@@ -268,6 +284,10 @@ PhysicsBody CreatePhysicsBody(Vector2 pos, float mass)
         newBody->mass = mass;
         newBody->inverseMass = 1/mass;
         
+        newBody->shape.type = PHYSICS_CIRCLE;
+        newBody->shape.body = newBody;
+        newBody->shape.radius = 30;
+        
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
@@ -315,7 +335,17 @@ PHYSACDEF void DrawPhysicsBodies(void)
 {
     for (int i = 0; i < physicsBodiesCount; i++)
     {
-        DrawCircleV(bodies[i]->position, 20, RED);
+        if (bodies[i]->shape.type == PHYSICS_CIRCLE)
+        {
+            // DrawCircleV(bodies[i]->position, bodies[i]->shape.radius, RED);
+            DrawCircleLines(bodies[i]->position.x, bodies[i]->position.y, bodies[i]->shape.radius, BLACK);
+            
+            Vector2 lineEndPos;
+            lineEndPos.x = bodies[i]->position.x + cos(bodies[i]->orient)*bodies[i]->shape.radius;
+            lineEndPos.y = bodies[i]->position.y + sin(bodies[i]->orient)*bodies[i]->shape.radius;
+            
+            DrawLineV(bodies[i]->position, lineEndPos, BLACK);
+        }
     }
 }
 
@@ -421,7 +451,16 @@ static void PhysicsStep(void)
             
             if (manifold->contactsCount > 0)
             {
-                // TODO: contact emplace_back
+                // Create a new manifold with same information as previously solved manifold and add it to the manifolds pool last slot
+                PhysicsManifold newManifold = CreatePhysicsManifold(A, B);
+                newManifold->penetration = manifold->penetration;
+                newManifold->normal = manifold->normal;
+                newManifold->contacts[0] = manifold->contacts[0];
+                newManifold->contacts[1] = manifold->contacts[1];
+                newManifold->contactsCount = manifold->contactsCount;
+                newManifold->e = manifold->e;
+                newManifold->df = manifold->df;
+                newManifold->sf = manifold->sf;
             }
         }
     }
