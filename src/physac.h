@@ -99,6 +99,7 @@ typedef struct PhysicsShape {
     PhysicsShapeType type;
     PhysicsBody body;
     float radius;               // Used for circle shapes
+    // TODO: add polygon information
 } PhysicsShape;
 
 typedef struct PhysicsBodyData {
@@ -117,7 +118,7 @@ typedef struct PhysicsBodyData {
     float mass;                 // Physics body mass
     float inverseMass;          // Inverse value of mass
     
-    PhysicsShape shape;
+    PhysicsShape shape;         // Physics body shape information (type, radius, vertexs, normals)
 } PhysicsBodyData;
 
 //----------------------------------------------------------------------------------
@@ -337,7 +338,6 @@ PHYSACDEF void DrawPhysicsBodies(void)
     {
         if (bodies[i]->shape.type == PHYSICS_CIRCLE)
         {
-            // DrawCircleV(bodies[i]->position, bodies[i]->shape.radius, RED);
             DrawCircleLines(bodies[i]->position.x, bodies[i]->position.y, bodies[i]->shape.radius, BLACK);
             
             Vector2 lineEndPos;
@@ -346,6 +346,7 @@ PHYSACDEF void DrawPhysicsBodies(void)
             
             DrawLineV(bodies[i]->position, lineEndPos, BLACK);
         }
+        // TODO: add polygon shapes drawing
     }
 }
 
@@ -404,7 +405,7 @@ static void *PhysicsLoop(void *arg)
         // Record the starting of this frame
         startTime = currentTime;
         
-        // TODO: test static delta time (1.0/60.0) and then implement current fps based delta time
+        // Fixed time stepping loop
         while (accumulator >= deltaTime)
         {
             if (!frameStepping) PhysicsStep();
