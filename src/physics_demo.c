@@ -22,7 +22,7 @@ int main()
     InitWindow(screenWidth, screenHeight, "raylib [physac] - demo");
     SetTargetFPS(60);
     
-    InitPhysics((Vector2){ 0.0f, -9.81f });     // TODO: check if real world gravity value gives good results
+    InitPhysics((Vector2){ 0.0f, -9.81f/1000 });     // TODO: check if real world gravity value gives good results
     
     PhysicsBody rectangle = CreatePhysicsBody((Vector2){ screenWidth/2, screenHeight/2 }, 1);
     //--------------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ int main()
 
             ClearBackground(RAYWHITE);
             
-            DrawPhysicsBodies(true);
+            DrawPhysicsBodies();
             
             DrawPhysicsInfo();
             

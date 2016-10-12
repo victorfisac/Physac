@@ -91,6 +91,12 @@ typedef struct PhysicsBodyData {
     unsigned int id;
     unsigned int index;
     Vector2 position;
+    Vector2 velocity;
+    Vector2 force;
+    
+    float angularVelocity;
+    float torque;
+    float orient;               // Rotation in radians
     
     float inertia;              // Moment of inertia
     float inverseInertia;       // Inverse value of inertia
@@ -106,7 +112,8 @@ PHYSACDEF void InitPhysics(Vector2 gravity);                        // Initializ
 PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float mass);   // Creates a new physics body with generic parameters
 void DestroyPhysicsBody(PhysicsBody body);                          // Unitializes and destroy a physics body
 
-PHYSACDEF void DrawPhysicsBodies();                                 // Draw all created physics physics bodies shapes
+PHYSACDEF void DrawPhysicsBodies(void);                             // Draw all created physics physics bodies shapes
+PHYSACDEF void DrawPhysicsInfo(void);                               // Draw debug information about physics states and values
 
 PHYSACDEF void ClosePhysics(void);                                  // Unitializes physics pointers and closes physics loop thread
 
@@ -186,10 +193,14 @@ static void PhysicsStep(void);                                                  
 static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b);         // Creates a new physics manifold to solve collision
 static void DestroyPhysicsManifold(PhysicsManifold manifold);                       // Unitializes and destroys a physics manifold
 void SolvePhysicsManifold(PhysicsManifold manifold);                                // Solves a created physics manifold between two physics bodies
+void IntegratePhysicsForces(PhysicsBody body);                                      // Integrates physics forces into velocity
+void InitializePhysicsManifolds(PhysicsManifold manifold);                          // Initializes physics manifolds to solve collisions
+void IntegratePhysicsImpulses(PhysicsManifold manifold);                            // Integrates physics collisions impulses to solve collisions
+void IntegratePhysicsVelocity(PhysicsBody body);                                    // Integrates physics velocity into position and forces
+void CorrectPhysicsPositions(PhysicsBody body);                                     // Corrects physics bodies positions
 
 static double GetCurrentTime(void);                                                 // Get current time in milliseconds
 static void MathClamp(double *value, double min, double max);                       // Clamp a value in a range
-static void DrawPhysicsInfo(void);                                                  // Draw debug information about physics states and values
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -244,7 +255,13 @@ PhysicsBody CreatePhysicsBody(Vector2 pos, float mass)
         // Initialize new body with generic values
         newBody->id = newId;
         newBody->index = physicsBodiesCount;
-        newBody->position = pos;
+        newBody->position = pos;    
+        newBody->velocity = (Vector2){ 0, 0 };
+        newBody->force = (Vector2){ 0, 0 };
+        
+        newBody->angularVelocity = 0;
+        newBody->torque = 0;
+        newBody->orient = 0;
         
         newBody->inertia = 0;
         newBody->inverseInertia = 0;
@@ -294,12 +311,18 @@ void DestroyPhysicsBody(PhysicsBody body)
 }
 
 // Draw all created physics bodies shapes
-PHYSACDEF void DrawPhysicsBodies()
+PHYSACDEF void DrawPhysicsBodies(void)
 {
     for (int i = 0; i < physicsBodiesCount; i++)
     {
         DrawCircleV(bodies[i]->position, 20, RED);
     }
+}
+
+// Draw debug information about physics states and values
+PHYSACDEF void DrawPhysicsInfo(void)
+{
+    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, BLACK);
 }
 
 // Unitializes physics pointers and exits physics loop thread
@@ -403,23 +426,27 @@ static void PhysicsStep(void)
         }
     }
     
-    // Auxiliar code
+    // Integrate forces to physics bodies
+    for (int i = 0; i < physicsBodiesCount; i++) IntegratePhysicsForces(bodies[i]);
+    
+    // Initialize physics manifolds to solve collisions
+    for (int i = 0; i < physicsManifoldsCount; i++) InitializePhysicsManifolds(contacts[i]);
+    
+    // Integrate physics collisions impulses to solve collisions
+    for (int i = 0; i < physicsManifoldsCount; i++) IntegratePhysicsImpulses(contacts[i]);
+    
+    // Integrate velocity to physics bodies
+    for (int i = 0; i < physicsBodiesCount; i++) IntegratePhysicsVelocity(bodies[i]);
+    
+    // Correct physics bodies positions
+    for (int i = 0; i < physicsBodiesCount; i++) CorrectPhysicsPositions(bodies[i]);
+    
+    // Clear physics bodies forces
     for (int i = 0; i < physicsBodiesCount; i++)
     {
-        bodies[i]->position.x += deltaTime/10;
+        bodies[i]->force = (Vector2){ 0, 0 };
+        bodies[i]->torque = 0;
     }
-    
-    // TODO: continue here with manifolds
-    
-    // TODO: calculate delta time
-    
-    // TODO: update dynamics
-    
-    // TODO: update collisions
-    
-    // TODO: other updates
-    
-    // TODO: test rendering interpolation for smooth rendering results
 }
 
 // Creates a new physics manifold to solve collision
@@ -512,7 +539,53 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
 // Solves a created physics manifold between two physics bodies
 void SolvePhysicsManifold(PhysicsManifold manifold)
 {
-    // TODO: solve collision manifold
+    // TODO: implement it
+}
+
+// Integrates physics forces into velocity
+void IntegratePhysicsForces(PhysicsBody body)
+{
+    if (body->inverseMass != 0)
+    {
+        body->velocity.x += (body->force.x*body->inverseMass + gravityForce.x)*(deltaTime/2);
+        body->velocity.y += (body->force.y*body->inverseMass + gravityForce.y)*(deltaTime/2);
+        
+        body->angularVelocity += body->torque*body->inverseInertia*(deltaTime/2);
+    }
+}
+
+// Initializes physics manifolds to solve collisions
+void InitializePhysicsManifolds(PhysicsManifold manifold)
+{
+    // TODO: implement it
+}
+
+// Integrates physics collisions impulses to solve collisions
+void IntegratePhysicsImpulses(PhysicsManifold manifold)
+{
+    // TODO: implement it
+}
+
+// Integrates physics velocity into position and forces
+void IntegratePhysicsVelocity(PhysicsBody body)
+{
+    if (body->inverseMass != 0)
+    {
+        body->position.x += body->velocity.x*deltaTime;
+        body->position.y -= body->velocity.y*deltaTime;
+        
+        body->orient += body->angularVelocity*deltaTime;
+        
+        // TODO: create set orient function for polygon shapes
+        
+        IntegratePhysicsForces(body);
+    }
+}
+
+// Corrects physics bodies positions
+void CorrectPhysicsPositions(PhysicsBody body)
+{
+    // TODO: implement it
 }
 
 // Get current time in milliseconds
@@ -535,12 +608,6 @@ static void MathClamp(double *value, double min, double max)
 {
     if (*value < min) *value = min;
     else if (*value > max) *value = max;
-}
-
-// Draw debug information about physics states and values
-static void DrawPhysicsInfo(void)
-{
-    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, BLACK);
 }
 
 #endif  // PHYSAC_IMPLEMENTATION
