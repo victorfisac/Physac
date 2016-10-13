@@ -81,6 +81,7 @@
 #define     MAX_PHYSICS_MANIFOLDS           256
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
+#define     PHYSAC_SHAPES_COLOR             GREEN
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -190,7 +191,7 @@ typedef struct PhysicsManifoldData {
     PhysicsBody bodyB;
     float penetration;      // Depth of penetration from collision
     Vector2 normal;         // Normal direction vector from 'a' to 'b'
-    Vector2 contacts[2];   // Points of contact during collision
+    Vector2 contacts[2];    // Points of contact during collision
     int contactsCount;      // Current collision number of contacts
     float e;                // Mixed restitution during collision
     float df;               // Mixed dynamic friction during collision
@@ -307,8 +308,8 @@ PhysicsBody CreatePhysicsBody(Vector2 pos, float density)
         newBody->inertia = newBody->mass*30*30;
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         
-        newBody->staticFriction = 0.2f;
-        newBody->dynamicFriction = 0.5f;
+        newBody->staticFriction = 0.4f;
+        newBody->dynamicFriction = 0.2f;
         newBody->restitution = 0.2;
         
         newBody->enabled = true;
@@ -374,13 +375,13 @@ PHYSACDEF void DrawPhysicsBodies(void)
     {
         if (bodies[i]->shape.type == PHYSICS_CIRCLE)
         {
-            DrawCircleLines(bodies[i]->position.x, bodies[i]->position.y, bodies[i]->shape.radius, BLACK);
+            DrawCircleLines(bodies[i]->position.x, bodies[i]->position.y, bodies[i]->shape.radius, PHYSAC_SHAPES_COLOR);
             
             Vector2 lineEndPos;
             lineEndPos.x = bodies[i]->position.x + cos(bodies[i]->orient)*bodies[i]->shape.radius;
             lineEndPos.y = bodies[i]->position.y + sin(bodies[i]->orient)*bodies[i]->shape.radius;
             
-            DrawLineV(bodies[i]->position, lineEndPos, BLACK);
+            DrawLineV(bodies[i]->position, lineEndPos, PHYSAC_SHAPES_COLOR);
         }
         
         // TODO: add polygon shapes drawing
