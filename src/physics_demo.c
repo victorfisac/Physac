@@ -27,8 +27,8 @@ int main()
     
     InitPhysics((Vector2){ 0.0f, 0 });     // TODO: check if real world gravity value gives good results
     
-    PhysicsBody A = CreatePhysicsBody((Vector2){ 80, screenHeight/2 }, 2);
-    PhysicsBody B = CreatePhysicsBody((Vector2){ 80 + 1, screenHeight/2 - 70 }, 2);
+    PhysicsBody A = CreatePhysicsBody((Vector2){ screenWidth/2, screenHeight/2 }, 2);
+    PhysicsBody B = CreatePhysicsBody((Vector2){ screenWidth/2 + 100, screenHeight/2 - 70 }, 2);
     A->useGravity = false;
     A->enabled = false;
     
@@ -43,12 +43,15 @@ int main()
         if (IsKeyDown(' ')) canStep = true;
         
         #define FORCE 100
+        #define TORQUE 1000
         
         if (IsKeyDown('D')) B->force.x += FORCE;
         else if (IsKeyDown('A')) B->force.x -= FORCE;
         
         if (IsKeyDown('S')) B->force.y += FORCE;
         else if (IsKeyDown('W')) B->force.y -= FORCE;
+        
+        if (IsKeyDown('T')) B->torque += TORQUE;
         
         //----------------------------------------------------------------------------------
         
