@@ -429,8 +429,6 @@ static void *PhysicsLoop(void *arg)
     physicsThreadEnabled = true;
     accumulator = 0;
     
-    // TODO: fix nan values, review math functions
-    
     // Initialize high resolution timer
     startTime = GetCurrentTime();
     
@@ -580,6 +578,7 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         contacts[physicsManifoldsCount] = newManifold;
         physicsManifoldsCount++;
         
+        // Avoided trace log due to bad performance for tracing messages each physics step
         // TraceLog(WARNING, "[PHYSAC] created physics manifold id %i with physics bodies id %i and %i [USED RAM: %i bytes]", newManifold->id, newManifold->bodyA->id, newManifold->bodyB->id, usedMemory);
     }
     else TraceLog(ERROR, "[PHYSAC] new physics manifold creation failed because there is any available id to use");
@@ -620,6 +619,7 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
         // Update physics manifolds count
         physicsManifoldsCount--;
         
+        // Avoided trace log due to bad performance for tracing messages each physics step
         // TraceLog(WARNING, "[PHYSAC] destroyed physics manifold id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
     }
     else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced manifold");
@@ -719,13 +719,10 @@ void IntegratePhysicsImpulses(PhysicsManifold manifold)
     PhysicsBody B = manifold->bodyB;
     
     // Early out and positional correct if both objects have infinite mass
-    if (fabs(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass) <= MATH_EPSILON || isnan(A->velocity.x) || isnan(A->velocity.y) || isnan(B->velocity.x) || isnan(B->velocity.y))
+    if (fabs(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass) <= MATH_EPSILON)
     {
-        A->velocity.x = 0;
-        A->velocity.y = 0;
-        
-        B->velocity.x = 0;
-        B->velocity.y = 0;
+        A->velocity = (Vector2){ 0, 0 };        
+        B->velocity = (Vector2){ 0, 0 };   
     }
     else
     {
@@ -748,17 +745,16 @@ void IntegratePhysicsImpulses(PhysicsManifold manifold)
             {
                 float raCrossN = MathCrossVector2(ra, manifold->normal);
                 float rbCrossN = MathCrossVector2(rb, manifold->normal);
-                float inverseMassSum = A->inverseMass + B->inverseMass + sqrt(raCrossN)*A->inverseInertia + sqrt(rbCrossN)*B->inverseInertia;
+                
+                float inverseMassSum = A->inverseMass + B->inverseMass + (raCrossN*raCrossN)*A->inverseInertia + (rbCrossN*rbCrossN)*B->inverseInertia;
                 
                 // Calculate impulse scalar value
                 float j = -(1.0f + manifold->e)*contactVelocity;
-                
-                j /= inverseMassSum;
+                j /= inverseMassSum;                
                 j /= (float)manifold->contactsCount;
                 
                 // Apply impulse to each physics body
                 Vector2 impulse = { manifold->normal.x*j, manifold->normal.y*j };
-                
                 A->velocity.x += A->inverseMass*(-impulse.x);
                 A->velocity.y += A->inverseMass*(-impulse.y);
                 A->angularVelocity += A->inverseInertia*MathCrossVector2(ra, (Vector2){ -impulse.x, -impulse.y });
@@ -776,7 +772,6 @@ void IntegratePhysicsImpulses(PhysicsManifold manifold)
                 
                 // Calculate 'j' tangent magnitude
                 float jt = -MathDot(rv, t);
-                
                 jt /= inverseMassSum;
                 jt /= (float)manifold->contactsCount;
                 
