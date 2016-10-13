@@ -11,9 +11,12 @@
 
 #define PHYSAC_IMPLEMENTATION
 #include "physac.h"
+#include "stdio.h"
 
 int main()
 {
+    remove("physac_log.txt");
+    
     // Initialization
     //--------------------------------------------------------------------------------------
     int screenWidth = 800;
@@ -24,8 +27,11 @@ int main()
     
     InitPhysics((Vector2){ 0.0f, 0 });     // TODO: check if real world gravity value gives good results
     
-    PhysicsBody rectangle = CreatePhysicsBody((Vector2){ screenWidth/2, screenHeight/2 }, 1);
-    rectangle->orient = 45*DEG2RAD;
+    PhysicsBody A = CreatePhysicsBody((Vector2){ 80, screenHeight/2 }, 2);
+    PhysicsBody B = CreatePhysicsBody((Vector2){ 80 + 1, screenHeight/2 - 70 }, 2);
+    A->useGravity = false;
+    A->enabled = false;
+    
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -36,8 +42,16 @@ int main()
         if (IsKeyPressed('F')) frameStepping = !frameStepping;
         if (IsKeyDown(' ')) canStep = true;
         
+        #define FORCE 100
+        
+        if (IsKeyDown('D')) B->force.x += FORCE;
+        else if (IsKeyDown('A')) B->force.x -= FORCE;
+        
+        if (IsKeyDown('S')) B->force.y += FORCE;
+        else if (IsKeyDown('W')) B->force.y -= FORCE;
+        
         //----------------------------------------------------------------------------------
-
+        
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
@@ -53,7 +67,7 @@ int main()
     }
 
     // De-Initialization
-    //--------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------------------   
     ClosePhysics();       // Unitialize physics
     CloseWindow();        // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
