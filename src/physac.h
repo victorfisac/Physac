@@ -234,12 +234,16 @@ static void PhysicsStep(void);                                                  
 
 static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b);         // Creates a new physics manifold to solve collision
 static void DestroyPhysicsManifold(PhysicsManifold manifold);                       // Unitializes and destroys a physics manifold
-void SolvePhysicsManifold(PhysicsManifold manifold);                                // Solves a created physics manifold between two physics bodies
-void IntegratePhysicsForces(PhysicsBody body);                                      // Integrates physics forces into velocity
-void InitializePhysicsManifolds(PhysicsManifold manifold);                          // Initializes physics manifolds to solve collisions
-void IntegratePhysicsImpulses(PhysicsManifold manifold);                            // Integrates physics collisions impulses to solve collisions
-void IntegratePhysicsVelocity(PhysicsBody body);                                    // Integrates physics velocity into position and forces
-void CorrectPhysicsPositions(PhysicsManifold manifold);                             // Corrects physics bodies positions based on manifolds collision information
+static void SolvePhysicsManifold(PhysicsManifold manifold);                         // Solves a created physics manifold between two physics bodies
+static void SolvePhysicsCircleToCircle(PhysicsManifold manifold);                   // Solves collision between two circle shape physics bodies
+static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold);                  // Solves collision between a circle to a polygon shape physics bodies
+static void SolvePhysicsPolygonToCircle(PhysicsManifold manifold);                  // Solves collision between a polygon to a circle shape physics bodies
+static void SolvePhysicsPolygonToPolygon(PhysicsManifold manifold);                 // Solves collision between two polygons shape physics bodies
+static void IntegratePhysicsForces(PhysicsBody body);                               // Integrates physics forces into velocity
+static void InitializePhysicsManifolds(PhysicsManifold manifold);                   // Initializes physics manifolds to solve collisions
+static void IntegratePhysicsImpulses(PhysicsManifold manifold);                     // Integrates physics collisions impulses to solve collisions
+static void IntegratePhysicsVelocity(PhysicsBody body);                             // Integrates physics velocity into position and forces
+static void CorrectPhysicsPositions(PhysicsManifold manifold);                      // Corrects physics bodies positions based on manifolds collision information
 
 static double GetCurrentTime(void);                                                 // Get current time in milliseconds
 static void MathClamp(double *value, double min, double max);                       // Clamp a value in a range
@@ -268,7 +272,7 @@ PHYSACDEF void InitPhysics(Vector2 gravity)
 }
 
 // Creates a new physics body with generic parameters
-PhysicsBody CreatePhysicsBody(Vector2 pos, float density)
+PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float density)
 {
     PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
     usedMemory += sizeof(PhysicsBodyData);
@@ -336,7 +340,7 @@ PhysicsBody CreatePhysicsBody(Vector2 pos, float density)
 }
 
 // Unitializes and destroys a physics body
-void DestroyPhysicsBody(PhysicsBody body)
+PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
 {
     if (body != NULL)
     {
@@ -654,7 +658,34 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
 }
 
 // Solves a created physics manifold between two physics bodies
-void SolvePhysicsManifold(PhysicsManifold manifold)
+static void SolvePhysicsManifold(PhysicsManifold manifold)
+{
+    switch (manifold->bodyA->shape.type)
+    {
+        case PHYSICS_CIRCLE:
+        {
+            switch (manifold->bodyB->shape.type)
+            {
+                case PHYSICS_CIRCLE: SolvePhysicsCircleToCircle(manifold); break;
+                case PHYSICS_POLYGON: SolvePhysicsCircleToPolygon(manifold); break;
+                default: break;
+            }
+        } break;
+        case PHYSICS_POLYGON:
+        {
+            switch (manifold->bodyB->shape.type)
+            {
+                case PHYSICS_CIRCLE: SolvePhysicsPolygonToCircle(manifold); break;
+                case PHYSICS_POLYGON: SolvePhysicsPolygonToPolygon(manifold); break;
+                default: break;
+            }
+        } break;
+        default: break;
+    }
+}
+
+// Solves collision between two circle shape physics bodies
+static void SolvePhysicsCircleToCircle(PhysicsManifold manifold)
 {
     PhysicsBody A = manifold->bodyA;
     PhysicsBody B = manifold->bodyB;
@@ -690,8 +721,26 @@ void SolvePhysicsManifold(PhysicsManifold manifold)
     }
 }
 
+// Solves collision between a circle to a polygon shape physics bodies
+static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold)
+{
+    // TODO: implement it
+}
+
+// Solves collision between a polygon to a circle shape physics bodies
+static void SolvePhysicsPolygonToCircle(PhysicsManifold manifold)
+{
+    // TODO: implement it
+}
+
+// Solves collision between two polygons shape physics bodies
+static void SolvePhysicsPolygonToPolygon(PhysicsManifold manifold)
+{
+    // TODO: implement it
+}
+
 // Integrates physics forces into velocity
-void IntegratePhysicsForces(PhysicsBody body)
+static void IntegratePhysicsForces(PhysicsBody body)
 {
     if (body->inverseMass != 0 && body->enabled)
     {
@@ -709,7 +758,7 @@ void IntegratePhysicsForces(PhysicsBody body)
 }
 
 // Initializes physics manifolds to solve collisions
-void InitializePhysicsManifolds(PhysicsManifold manifold)
+static void InitializePhysicsManifolds(PhysicsManifold manifold)
 {
     PhysicsBody A = manifold->bodyA;
     PhysicsBody B = manifold->bodyB;
@@ -741,7 +790,7 @@ void InitializePhysicsManifolds(PhysicsManifold manifold)
 }
 
 // Integrates physics collisions impulses to solve collisions
-void IntegratePhysicsImpulses(PhysicsManifold manifold)
+static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 {
     PhysicsBody A = manifold->bodyA;
     PhysicsBody B = manifold->bodyB;
@@ -828,7 +877,7 @@ void IntegratePhysicsImpulses(PhysicsManifold manifold)
 }
 
 // Integrates physics velocity into position and forces
-void IntegratePhysicsVelocity(PhysicsBody body)
+static void IntegratePhysicsVelocity(PhysicsBody body)
 {
     if (body->inverseMass != 0 && body->enabled)
     {
@@ -844,7 +893,7 @@ void IntegratePhysicsVelocity(PhysicsBody body)
 }
 
 // Corrects physics bodies positions based on manifolds collision information
-void CorrectPhysicsPositions(PhysicsManifold manifold)
+static void CorrectPhysicsPositions(PhysicsManifold manifold)
 {
     Vector2 correction;
     correction.x = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass))*manifold->normal.x*PENETRATION_CORRECTION;

@@ -30,6 +30,7 @@ int main()
     PhysicsBody A = CreatePhysicsBody((Vector2){ screenWidth/2, screenHeight/2 }, 2);
     PhysicsBody B = CreatePhysicsBody((Vector2){ screenWidth/2 + 100, screenHeight/2 - 70 }, 2);
     
+    A->enabled = false;
     //--------------------------------------------------------------------------------------
 
     // Main game loop
