@@ -61,6 +61,8 @@ int main()
             
             DrawPhysicsBodies();
             
+            DrawPhysicsContacts();
+            
             DrawPhysicsInfo();
             
         EndDrawing();

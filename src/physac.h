@@ -82,6 +82,10 @@
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
 #define     PHYSAC_SHAPES_COLOR             GREEN
+#define     PHYSAC_INFO_COLOR               WHITE
+#define     PHYSAC_CONTACTS_RADIUS          3
+#define     PHYSAC_CONTACTS_NORMAL          10
+#define     PHYSAC_CONTACTS_COLOR           RED
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -114,12 +118,12 @@ typedef struct PhysicsShape {
 
 typedef struct PhysicsBodyData {
     unsigned int id;
-    Vector2 position;
-    Vector2 velocity;
-    Vector2 force;
+    Vector2 position;           // Physics body shape pivot
+    Vector2 velocity;           // Current linear velocity applied to position
+    Vector2 force;              // Current linear force (reset to 0 every step)
     
-    float angularVelocity;
-    float torque;
+    float angularVelocity;      // Current angular velocity applied to orient
+    float torque;               // Current angular force (reset to 0 every step)
     float orient;               // Rotation in radians
     
     float inertia;              // Moment of inertia
@@ -127,12 +131,12 @@ typedef struct PhysicsBodyData {
     float mass;                 // Physics body mass
     float inverseMass;          // Inverse value of mass
     
-    float staticFriction;
-    float dynamicFriction;
-    float restitution;
+    float staticFriction;       // Friction when the body has not movement (0 to 1)
+    float dynamicFriction;      // Friction when the body has movement (0 to 1)
+    float restitution;          // Restitution coefficient of the body (0 to 1)
     
-    bool enabled;
-    bool useGravity;
+    bool enabled;               // Enabled dynamics state (collisions are calculated anyway)
+    bool useGravity;            // Apply gravity force to dynamics
     
     PhysicsShape shape;         // Physics body shape information (type, radius, vertexs, normals)
 } PhysicsBodyData;
@@ -143,10 +147,11 @@ typedef struct PhysicsBodyData {
 PHYSACDEF void InitPhysics(Vector2 gravity);                                // Initializes physics values, pointers and creates physics loop thread
 
 PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float density);        // Creates a new physics body with generic parameters
-void DestroyPhysicsBody(PhysicsBody body);                                  // Unitializes and destroy a physics body
+PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                        // Unitializes and destroy a physics body
 
-PHYSACDEF void DrawPhysicsBodies(void);                                     // Draw all created physics physics bodies shapes
-PHYSACDEF void DrawPhysicsInfo(void);                                       // Draw debug information about physics states and values
+PHYSACDEF void DrawPhysicsBodies(void);                                     // Draws all created physics bodies shapes
+PHYSACDEF void DrawPhysicsContacts(void);                                   // Draws all calculated physics contacts points and its normals
+PHYSACDEF void DrawPhysicsInfo(void);                                       // Draws debug information about physics states and values
 
 PHYSACDEF void ClosePhysics(void);                                          // Unitializes physics pointers and closes physics loop thread
 
@@ -164,8 +169,8 @@ PHYSACDEF void ClosePhysics(void);                                          // U
     #include <pthread.h>        // Required for: pthread_t, pthread_create()
 #endif
 
-#include <math.h>               // Required for: sqrt()
-#include <stdlib.h>             // Required for: malloc(), free()
+#include <math.h>                           // Required for: sqrt()
+#include <stdlib.h>                         // Required for: malloc(), free()
 #include "C:\raylib\raylib\src\utils.h"     // Required for: TraceLog()
 
 // Functions required to query time on Windows
@@ -368,7 +373,7 @@ void DestroyPhysicsBody(PhysicsBody body)
     else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced body");
 }
 
-// Draw all created physics bodies shapes
+// Draws all created physics bodies shapes
 PHYSACDEF void DrawPhysicsBodies(void)
 {
     for (int i = 0; i < physicsBodiesCount; i++)
@@ -388,15 +393,37 @@ PHYSACDEF void DrawPhysicsBodies(void)
     }
 }
 
-// Draw debug information about physics states and values
+// Draws all calculated physics contacts points and its normals
+PHYSACDEF void DrawPhysicsContacts(void)
+{
+    for (int i = 0; i < physicsManifoldsCount; i++)
+    {
+        PhysicsManifold manifold = contacts[i];
+        
+        if (manifold != NULL)
+        {
+            for (int j = 0; j < manifold->contactsCount; j++)
+            {
+                DrawCircleV(manifold->contacts[j], PHYSAC_CONTACTS_RADIUS, PHYSAC_CONTACTS_COLOR);
+                
+                Vector2 startPosition = manifold->contacts[j];
+                Vector2 endPosition = { startPosition.x + manifold->normal.x*PHYSAC_CONTACTS_NORMAL, startPosition.y + manifold->normal.y*PHYSAC_CONTACTS_NORMAL };
+                
+                DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
+            }
+        }
+    }
+}
+
+// Draws debug information about physics states and values
 PHYSACDEF void DrawPhysicsInfo(void)
 {
-    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, BLACK);
+    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, PHYSAC_INFO_COLOR);
     
     for (int i = 0; i < physicsBodiesCount; i++)
     {
         PhysicsBody b = bodies[i];
-        DrawText(FormatText("id: %i\nvelocity: %02f, %02f\nposition: %02f, %02f\nangular: %02f\n", b->id, b->velocity.x, b->velocity.y, b->position.x, b->position.y, b->angularVelocity), 10, 30 + i*15*5, 10, BLACK);
+        DrawText(FormatText("id: %i\nvelocity: %02f, %02f\nposition: %02f, %02f\nangular: %02f\n", b->id, b->velocity.x, b->velocity.y, b->position.x, b->position.y, b->angularVelocity), 10, 30 + i*15*5, 10, PHYSAC_INFO_COLOR);
     }
 }
 
