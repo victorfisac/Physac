@@ -79,6 +79,7 @@
 #define     MAX_TIMESTEP                    0.02
 #define     MAX_PHYSICS_BODIES              256
 #define     MAX_PHYSICS_MANIFOLDS           256
+#define     PHYSAC_MAX_VERTICES             8
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
 #define     PHYSAC_SHAPES_COLOR             GREEN
@@ -109,11 +110,21 @@ typedef enum PhysicsShapeType { PHYSICS_CIRCLE, PHYSICS_POLYGON } PhysicsShapeTy
 // Previously defined to be used in PhysicsShape struct as circular dependencies
 typedef struct PhysicsBodyData *PhysicsBody;
 
+typedef struct PolygonData {
+    unsigned int vertexCount;                   // Current used vertex and normals count
+    Vector2 vertices[PHYSAC_MAX_VERTICES];      // Polygon vertex positions vectors
+    Vector2 normals[PHYSAC_MAX_VERTICES];       // Polygon vertex normals vectors
+} PolygonData;
+
 typedef struct PhysicsShape {
     PhysicsShapeType type;
     PhysicsBody body;
-    float radius;               // Used for circle shapes
-    // TODO: add polygon information
+    
+    // Used for circle shapes
+    float radius;                       // Circle shape radius (used for drawing and mass/inertia computation)
+
+    // Used for polygon shapes
+    PolygonData vertexData;             // Polygon shape vertices position and normals data
 } PhysicsShape;
 
 typedef struct PhysicsBodyData {
@@ -138,22 +149,23 @@ typedef struct PhysicsBodyData {
     bool enabled;               // Enabled dynamics state (collisions are calculated anyway)
     bool useGravity;            // Apply gravity force to dynamics
     
-    PhysicsShape shape;         // Physics body shape information (type, radius, vertexs, normals)
+    PhysicsShape shape;         // Physics body shape information (type, radius, vertices, normals)
 } PhysicsBodyData;
 
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
-PHYSACDEF void InitPhysics(Vector2 gravity);                                // Initializes physics values, pointers and creates physics loop thread
+PHYSACDEF void InitPhysics(Vector2 gravity);                                                    // Initializes physics values, pointers and creates physics loop thread
 
-PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float density);        // Creates a new physics body with generic parameters
-PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                        // Unitializes and destroy a physics body
+PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);        // Creates a new physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density);                     // Creates a new physics body with generic parameters
 
-PHYSACDEF void DrawPhysicsBodies(void);                                     // Draws all created physics bodies shapes
-PHYSACDEF void DrawPhysicsContacts(void);                                   // Draws all calculated physics contacts points and its normals
-PHYSACDEF void DrawPhysicsInfo(void);                                       // Draws debug information about physics states and values
+PHYSACDEF void DrawPhysicsBodies(void);                 // Draws all created physics bodies shapes
+PHYSACDEF void DrawPhysicsContacts(void);               // Draws all calculated physics contacts points and its normals
+PHYSACDEF void DrawPhysicsInfo(void);                   // Draws debug information about physics states and values
 
-PHYSACDEF void ClosePhysics(void);                                          // Unitializes physics pointers and closes physics loop thread
+PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);    // Unitializes and destroy a physics body
+PHYSACDEF void ClosePhysics(void);                      // Unitializes physics pointers and closes physics loop thread
 
 #endif // PHYSAC_H
 
@@ -192,20 +204,21 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 //----------------------------------------------------------------------------------
 typedef struct PhysicsManifoldData {
     int id;
-    PhysicsBody bodyA;
-    PhysicsBody bodyB;
-    float penetration;      // Depth of penetration from collision
-    Vector2 normal;         // Normal direction vector from 'a' to 'b'
-    Vector2 contacts[2];    // Points of contact during collision
-    int contactsCount;      // Current collision number of contacts
-    float e;                // Mixed restitution during collision
-    float df;               // Mixed dynamic friction during collision
-    float sf;               // Mixed static friction during collision
+    PhysicsBody bodyA;              // Manifold first physics body reference
+    PhysicsBody bodyB;              // Manifold second physics body reference
+    float penetration;              // Depth of penetration from collision
+    Vector2 normal;                 // Normal direction vector from 'a' to 'b'
+    Vector2 contacts[2];            // Points of contact during collision
+    unsigned int contactsCount;     // Current collision number of contacts
+    float e;                        // Mixed restitution during collision
+    float df;                       // Mixed dynamic friction during collision
+    float sf;                       // Mixed static friction during collision
 } PhysicsManifoldData, *PhysicsManifold;
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
+static unsigned int usedMemory = 0;                         // Total allocated dynamic memory
 static bool frameStepping = false;                          // Physics frame stepping state
 static bool canStep = false;                                // Physics frame stepping input state
 static bool physicsThreadEnabled = false;                   // Physics thread enabled state
@@ -215,20 +228,19 @@ static double startTime = 0;                                // Start time in mil
 static double deltaTime = STATIC_DELTATIME;                 // Delta time used for physics steps
 static double accumulator = 0;                              // Physics time step delta time accumulator
 
-static int stepsCount = 0;                                  // Total physics steps processed
+static unsigned int stepsCount = 0;                         // Total physics steps processed
 static Vector2 gravityForce = { 0, 0 };                     // Physics world gravity force
 
 static PhysicsBody bodies[MAX_PHYSICS_BODIES];              // Physics bodies pointers array
-static int physicsBodiesCount = 0;                          // Physics world current bodies counter
+static unsigned int physicsBodiesCount = 0;                 // Physics world current bodies counter
 
 static PhysicsManifold contacts[MAX_PHYSICS_MANIFOLDS];     // Physics bodies pointers array
-static int physicsManifoldsCount = 0;                       // Physics world current manifolds counter
-
-static int usedMemory = 0;                                  // Total allocated dynamic memory
+static unsigned int physicsManifoldsCount = 0;              // Physics world current manifolds counter
 
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
+static PolygonData CreateRandomPolygon(int minDistance, int maxDistance);           // Creates a random polygon shape with max vertex distance from polygon pivot
 static void *PhysicsLoop(void *arg);                                                // Physics loop thread function
 static void PhysicsStep(void);                                                      // Physics steps calculations (dynamics, collisions and position corrections)
 
@@ -272,7 +284,7 @@ PHYSACDEF void InitPhysics(Vector2 gravity)
 }
 
 // Creates a new physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float density)
+PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius)
 {
     PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
     usedMemory += sizeof(PhysicsBodyData);
@@ -312,9 +324,9 @@ PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float density)
         newBody->torque = 0;
         newBody->orient = 0;
         
-        newBody->mass = PI*30*30*density;
+        newBody->mass = PI*radius*radius*density;
         newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
-        newBody->inertia = newBody->mass*30*30;
+        newBody->inertia = newBody->mass*radius*radius;
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         
         newBody->staticFriction = 0.4f;
@@ -326,17 +338,182 @@ PHYSACDEF PhysicsBody CreatePhysicsBody(Vector2 pos, float density)
         
         newBody->shape.type = PHYSICS_CIRCLE;
         newBody->shape.body = newBody;
-        newBody->shape.radius = 30;
+        newBody->shape.radius = radius;
         
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
         
-        TraceLog(WARNING, "[PHYSAC] created physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+        TraceLog(WARNING, "[PHYSAC] created circle physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
     }
     else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
     
     return newBody;
+}
+
+// Creates a new physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density)
+{
+    PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
+    usedMemory += sizeof(PhysicsBodyData);
+    
+    int newId = -1;
+    for (int i = 0; i < MAX_PHYSICS_BODIES; i++)
+    {
+        int currentId = i;
+        
+        // Check if current id already exist in other physics body
+        for (int k = 0; k < physicsBodiesCount; k++)
+        {
+            if (bodies[k]->id == currentId)
+            {
+                currentId++;
+                break;
+            }
+        }
+        
+        // If it is not used, use it as new physics body id
+        if (currentId == i)
+        {
+            newId = i;
+            break;
+        }
+    }
+    
+    if (newId != -1)
+    {
+        // Initialize new body with generic values
+        newBody->id = newId;
+        newBody->position = pos;    
+        newBody->velocity = (Vector2){ 0, 0 };
+        newBody->force = (Vector2){ 0, 0 };
+        
+        newBody->angularVelocity = 0;
+        newBody->torque = 0;
+        newBody->orient = 0;
+        
+        newBody->shape.type = PHYSICS_POLYGON;
+        newBody->shape.body = newBody;
+        newBody->shape.vertexData = CreateRandomPolygon(25, 75);
+        
+        // TODO: compute polygon mass and inertia
+        // newBody->mass = PI*radius*radius*density;
+        // newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
+        // newBody->inertia = newBody->mass*radius*radius;
+        // newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
+        
+        newBody->staticFriction = 0.4f;
+        newBody->dynamicFriction = 0.2f;
+        newBody->restitution = 0.2;
+        
+        newBody->enabled = true;
+        newBody->useGravity = true;
+
+        // Add new body to bodies pointers array and update bodies count
+        bodies[physicsBodiesCount] = newBody;
+        physicsBodiesCount++;
+        
+        TraceLog(WARNING, "[PHYSAC] created polygon physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+    }
+    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
+    
+    return newBody;
+}
+
+// Draws all created physics bodies shapes
+PHYSACDEF void DrawPhysicsBodies(void)
+{
+    for (int i = 0; i < physicsBodiesCount; i++)
+    {
+        PhysicsBody body = bodies[i];
+        
+        if (body != NULL)
+        {
+            switch (bodies[i]->shape.type)
+            {
+                case PHYSICS_CIRCLE:
+                {
+                    DrawCircleLines(body->position.x, body->position.y, body->shape.radius, PHYSAC_SHAPES_COLOR);
+                    
+                    Vector2 lineEndPos;
+                    lineEndPos.x = body->position.x + cos(body->orient)*body->shape.radius;
+                    lineEndPos.y = body->position.y + sin(body->orient)*body->shape.radius;
+                    
+                    DrawLineV(body->position, lineEndPos, PHYSAC_SHAPES_COLOR);
+                } break;
+                case PHYSICS_POLYGON:
+                {
+                    PolygonData data = body->shape.vertexData;
+                    Vector2 position = { 0, 0 };
+                    
+                    for (int i = 0; i < data.vertexCount; i++)
+                    {
+                        /*position = body->position;
+                        position.x += data.vertices[i].x;
+                        position.y += data.vertices[i].y;
+                        
+                        DrawCircleV(position, 2, PHYSAC_SHAPES_COLOR);*/
+                        
+                        // Draw vertex face with lines
+                        int ii = (((i + 1) < data.vertexCount) ? (i + 1) : 0);
+                        Vector2 startPosition = { body->position.x + data.vertices[i].x, body->position.y + data.vertices[i].y };
+                        Vector2 endPosition = { body->position.x + data.vertices[ii].x, body->position.y + data.vertices[ii].y };
+                        
+                        DrawLineV(startPosition, endPosition, PHYSAC_SHAPES_COLOR);
+                        
+                        startPosition.x = data.vertices[i].x + (data.vertices[ii].x - data.vertices[i].x)/2;
+                        startPosition.y = data.vertices[i].y + (data.vertices[ii].y - data.vertices[i].y)/2;
+                        
+                        startPosition.x += body->position.x;
+                        startPosition.y += body->position.y;
+                        
+                        // Draw vertex normals with lines                        
+                        endPosition.x = startPosition.x + data.normals[i].x*PHYSAC_CONTACTS_NORMAL;
+                        endPosition.y = startPosition.y + data.normals[i].y*PHYSAC_CONTACTS_NORMAL;
+                        
+                        DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
+                        
+                        // DrawLine(body->position.x - 2, body->position.y, body->position.x + 2, body->position.y, WHITE);
+                        // DrawLine(body->position.x, body->position.y - 2, body->position.x, body->position.y + 2, WHITE);
+                    }
+                } break;
+            }
+        }
+    }
+}
+
+// Draws all calculated physics contacts points and its normals
+PHYSACDEF void DrawPhysicsContacts(void)
+{
+    for (int i = 0; i < physicsManifoldsCount; i++)
+    {
+        PhysicsManifold manifold = contacts[i];
+        
+        if (manifold != NULL)
+        {
+            for (int j = 0; j < manifold->contactsCount; j++)
+            {
+                DrawCircleV(manifold->contacts[j], PHYSAC_CONTACTS_RADIUS, PHYSAC_CONTACTS_COLOR);
+                
+                Vector2 startPosition = manifold->contacts[j];
+                Vector2 endPosition = { startPosition.x + manifold->normal.x*PHYSAC_CONTACTS_NORMAL, startPosition.y + manifold->normal.y*PHYSAC_CONTACTS_NORMAL };
+                
+                DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
+            }
+        }
+    }
+}
+
+// Draws debug information about physics states and values
+PHYSACDEF void DrawPhysicsInfo(void)
+{
+    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, PHYSAC_INFO_COLOR);
+    
+    for (int i = 0; i < physicsBodiesCount; i++)
+    {
+        PhysicsBody b = bodies[i];
+        DrawText(FormatText("id: %i\nvelocity: %02f, %02f\nposition: %02f, %02f\nangular: %02f\n", b->id, b->velocity.x, b->velocity.y, b->position.x, b->position.y, b->angularVelocity), 10, 30 + i*15*5, 10, PHYSAC_INFO_COLOR);
+    }
 }
 
 // Unitializes and destroys a physics body
@@ -377,60 +554,6 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
     else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced body");
 }
 
-// Draws all created physics bodies shapes
-PHYSACDEF void DrawPhysicsBodies(void)
-{
-    for (int i = 0; i < physicsBodiesCount; i++)
-    {
-        if (bodies[i]->shape.type == PHYSICS_CIRCLE)
-        {
-            DrawCircleLines(bodies[i]->position.x, bodies[i]->position.y, bodies[i]->shape.radius, PHYSAC_SHAPES_COLOR);
-            
-            Vector2 lineEndPos;
-            lineEndPos.x = bodies[i]->position.x + cos(bodies[i]->orient)*bodies[i]->shape.radius;
-            lineEndPos.y = bodies[i]->position.y + sin(bodies[i]->orient)*bodies[i]->shape.radius;
-            
-            DrawLineV(bodies[i]->position, lineEndPos, PHYSAC_SHAPES_COLOR);
-        }
-        
-        // TODO: add polygon shapes drawing
-    }
-}
-
-// Draws all calculated physics contacts points and its normals
-PHYSACDEF void DrawPhysicsContacts(void)
-{
-    for (int i = 0; i < physicsManifoldsCount; i++)
-    {
-        PhysicsManifold manifold = contacts[i];
-        
-        if (manifold != NULL)
-        {
-            for (int j = 0; j < manifold->contactsCount; j++)
-            {
-                DrawCircleV(manifold->contacts[j], PHYSAC_CONTACTS_RADIUS, PHYSAC_CONTACTS_COLOR);
-                
-                Vector2 startPosition = manifold->contacts[j];
-                Vector2 endPosition = { startPosition.x + manifold->normal.x*PHYSAC_CONTACTS_NORMAL, startPosition.y + manifold->normal.y*PHYSAC_CONTACTS_NORMAL };
-                
-                DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
-            }
-        }
-    }
-}
-
-// Draws debug information about physics states and values
-PHYSACDEF void DrawPhysicsInfo(void)
-{
-    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, PHYSAC_INFO_COLOR);
-    
-    for (int i = 0; i < physicsBodiesCount; i++)
-    {
-        PhysicsBody b = bodies[i];
-        DrawText(FormatText("id: %i\nvelocity: %02f, %02f\nposition: %02f, %02f\nangular: %02f\n", b->id, b->velocity.x, b->velocity.y, b->position.x, b->position.y, b->angularVelocity), 10, 30 + i*15*5, 10, PHYSAC_INFO_COLOR);
-    }
-}
-
 // Unitializes physics pointers and exits physics loop thread
 PHYSACDEF void ClosePhysics(void)
 {
@@ -452,6 +575,36 @@ PHYSACDEF void ClosePhysics(void)
 //----------------------------------------------------------------------------------
 // Module Internal Functions Definition
 //----------------------------------------------------------------------------------
+// Creates a random polygon shape with max vertex distance from polygon pivot
+static PolygonData CreateRandomPolygon(int minDistance, int maxDistance)
+{
+    PolygonData data = { 0 };
+    
+    unsigned int count = GetRandomValue(3, PHYSAC_MAX_VERTICES);
+    data.vertexCount = count;
+    
+    int distance = GetRandomValue(minDistance, maxDistance);
+    
+    // Calculate polygon vertices positions
+    for (int i = 0; i < count; i++)
+    {
+        data.vertices[i].x = cos(360/count*i*DEG2RAD)*distance;
+        data.vertices[i].y = sin(360/count*i*DEG2RAD)*distance;
+    }
+    
+    // Calculate polygon faces normals
+    for (int i = 0; i < count; i++)
+    {
+        int ii = (((i + 1) < count) ? (i + 1) : 0);
+        Vector2 face = { data.vertices[ii].x - data.vertices[i].x, data.vertices[ii].y - data.vertices[i].y };
+        
+        data.normals[i] = (Vector2){ face.y, -face.x };
+        MathNormalize(&data.normals[i]);
+    }
+    
+    return data;
+}
+
 // Physics loop thread function
 static void *PhysicsLoop(void *arg)
 {
@@ -546,7 +699,10 @@ static void PhysicsStep(void)
     for (int i = 0; i < physicsManifoldsCount; i++) InitializePhysicsManifolds(contacts[i]);
     
     // Integrate physics collisions impulses to solve collisions
-    for (int i = 0; i < physicsManifoldsCount; i++) IntegratePhysicsImpulses(contacts[i]);
+    for (int i = 0; i < COLLISION_INTERATIONS; i++)
+    {
+        for (int j = 0; j < physicsManifoldsCount; j++) IntegratePhysicsImpulses(contacts[j]);
+    }
     
     // Integrate velocity to physics bodies
     for (int i = 0; i < physicsBodiesCount; i++) IntegratePhysicsVelocity(bodies[i]);

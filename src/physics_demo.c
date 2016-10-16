@@ -13,6 +13,9 @@
 #include "physac.h"
 #include "stdio.h"
 
+#define     FORCE       100
+#define     TORQUE      10000
+
 int main()
 {
     remove("physac_log.txt");
@@ -27,10 +30,9 @@ int main()
     
     InitPhysics((Vector2){ 0.0f, 0 });     // TODO: check if real world gravity value gives good results
     
-    PhysicsBody A = CreatePhysicsBody((Vector2){ screenWidth/2, screenHeight/2 }, 2);
-    PhysicsBody B = CreatePhysicsBody((Vector2){ screenWidth/2 + 100, screenHeight/2 - 70 }, 2);
-    
-    A->enabled = false;
+    PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 30);
+    PhysicsBody B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2 + 100, screenHeight/2 - 70 }, 2, 30);
+    PhysicsBody C = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2 + 300, screenHeight/2 + 100 }, 10);
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -40,9 +42,6 @@ int main()
         //----------------------------------------------------------------------------------        
         if (IsKeyPressed('F')) frameStepping = !frameStepping;
         if (IsKeyDown(' ')) canStep = true;
-        
-        #define FORCE 100
-        #define TORQUE 1000
         
         if (IsKeyDown('D')) B->force.x += FORCE;
         else if (IsKeyDown('A')) B->force.x -= FORCE;
