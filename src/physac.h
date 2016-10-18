@@ -110,7 +110,16 @@ typedef enum PhysicsShapeType { PHYSICS_CIRCLE, PHYSICS_POLYGON } PhysicsShapeTy
 // Previously defined to be used in PhysicsShape struct as circular dependencies
 typedef struct PhysicsBodyData *PhysicsBody;
 
+typedef struct Mat2
+{
+    float m00;
+    float m01;
+    float m10;
+    float m11;
+} Mat2;
+
 typedef struct PolygonData {
+    Mat2 transform;                             // Vertices transform matrix 2x2
     unsigned int vertexCount;                   // Current used vertex and normals count
     Vector2 vertices[PHYSAC_MAX_VERTICES];      // Polygon vertex positions vectors
     Vector2 normals[PHYSAC_MAX_VERTICES];       // Polygon vertex normals vectors
@@ -151,6 +160,19 @@ typedef struct PhysicsBodyData {
     
     PhysicsShape shape;         // Physics body shape information (type, radius, vertices, normals)
 } PhysicsBodyData;
+
+typedef struct PhysicsManifoldData {
+    int id;
+    PhysicsBody bodyA;              // Manifold first physics body reference
+    PhysicsBody bodyB;              // Manifold second physics body reference
+    float penetration;              // Depth of penetration from collision
+    Vector2 normal;                 // Normal direction vector from 'a' to 'b'
+    Vector2 contacts[2];            // Points of contact during collision
+    unsigned int contactsCount;     // Current collision number of contacts
+    float e;                        // Mixed restitution during collision
+    float df;                       // Mixed dynamic friction during collision
+    float sf;                       // Mixed static friction during collision
+} PhysicsManifoldData, *PhysicsManifold;
 
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
@@ -196,24 +218,15 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 #define     min(a,b)                    (((a)<(b))?(a):(b))
 #define     max(a,b)                    (((a)>(b))?(a):(b))
 #define     MATH_EPSILON                0.0001f
+#define     MATH_DEG2RAD                (PI/180.0f)
+#define     MATH_RAD2DEG                (180.0f/PI)
 #define     PENETRATION_ALLOWANCE       0.05f
 #define     PENETRATION_CORRECTION      0.4f
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
-typedef struct PhysicsManifoldData {
-    int id;
-    PhysicsBody bodyA;              // Manifold first physics body reference
-    PhysicsBody bodyB;              // Manifold second physics body reference
-    float penetration;              // Depth of penetration from collision
-    Vector2 normal;                 // Normal direction vector from 'a' to 'b'
-    Vector2 contacts[2];            // Points of contact during collision
-    unsigned int contactsCount;     // Current collision number of contacts
-    float e;                        // Mixed restitution during collision
-    float df;                       // Mixed dynamic friction during collision
-    float sf;                       // Mixed static friction during collision
-} PhysicsManifoldData, *PhysicsManifold;
+// ...
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
@@ -264,6 +277,16 @@ static float MathCrossVector2(Vector2 a, Vector2 b);                            
 static float MathLenSqr(Vector2 v);                                                 // Returns the len square root of a vector
 static float MathDot(Vector2 a, Vector2 b);                                         // Returns the dot product of two vectors
 static void MathNormalize(Vector2 *v);                                              // Returns the normalized values of a vector
+
+static Mat2 Mat2Radians(float radians);                                             // Creates a matrix 2x2 from a given radians value
+static Mat2 CreateMat2(float a, float b, float c, float d);                         // Creates a matrix 2x2 from specific values
+static void Mat2Set(Mat2 *matrix, float radians);                                   // Set values from radians to a created matrix 2x2
+static void Mat2Abs(Mat2 *matrix, float radians);                                   // Converts to absolute value every matrix values
+static Vector2 Mat2AxisX(Mat2 matrix);                                              // Returns m00 and m10 as a Vector2 struct of a matrix 2x2
+static Vector2 Mat2AxisY(Mat2 matrix);                                              // Returns m01 and m11 as a Vector2 struct of a matrix 2x2
+static Mat2 Mat2Transpose(Mat2 m);                                                  // Returns the transpose of a given matrix 2x2
+static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                              // Multiplies a vector by a matrix 2x2
+static Mat2 Mat2Multiply(Mat2 m1, Mat2 m2);                                         // Multiplies two given matrices 2x2
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
@@ -447,29 +470,29 @@ PHYSACDEF void DrawPhysicsBodies(void)
                     Vector2 position = { 0, 0 };
                     
                     for (int i = 0; i < data.vertexCount; i++)
-                    {
-                        /*position = body->position;
-                        position.x += data.vertices[i].x;
-                        position.y += data.vertices[i].y;
-                        
-                        DrawCircleV(position, 2, PHYSAC_SHAPES_COLOR);*/
-                        
+                    {                        
                         // Draw vertex face with lines
                         int ii = (((i + 1) < data.vertexCount) ? (i + 1) : 0);
-                        Vector2 startPosition = { body->position.x + data.vertices[i].x, body->position.y + data.vertices[i].y };
-                        Vector2 endPosition = { body->position.x + data.vertices[ii].x, body->position.y + data.vertices[ii].y };
+                        Vector2 vertexA = Mat2MultiplyVector2(data.transform, data.vertices[i]);
+                        Vector2 startPosition = { body->position.x + vertexA.x, body->position.y + vertexA.y };
+                        
+                        Vector2 vertexB = Mat2MultiplyVector2(data.transform, data.vertices[ii]);
+                        Vector2 endPosition = { body->position.x + vertexB.x, body->position.y + vertexB.y };
                         
                         DrawLineV(startPosition, endPosition, PHYSAC_SHAPES_COLOR);
                         
                         startPosition.x = data.vertices[i].x + (data.vertices[ii].x - data.vertices[i].x)/2;
                         startPosition.y = data.vertices[i].y + (data.vertices[ii].y - data.vertices[i].y)/2;
                         
+                        startPosition = Mat2MultiplyVector2(data.transform, startPosition);
+                        
                         startPosition.x += body->position.x;
                         startPosition.y += body->position.y;
                         
-                        // Draw vertex normals with lines                        
-                        endPosition.x = startPosition.x + data.normals[i].x*PHYSAC_CONTACTS_NORMAL;
-                        endPosition.y = startPosition.y + data.normals[i].y*PHYSAC_CONTACTS_NORMAL;
+                        // Draw vertex normals with lines             
+                        vertexA = Mat2MultiplyVector2(data.transform, data.normals[i]);
+                        endPosition.x = startPosition.x + vertexA.x*PHYSAC_CONTACTS_NORMAL;
+                        endPosition.y = startPosition.y + vertexA.y*PHYSAC_CONTACTS_NORMAL;
                         
                         DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
                         
@@ -583,13 +606,16 @@ static PolygonData CreateRandomPolygon(int minDistance, int maxDistance)
     unsigned int count = GetRandomValue(3, PHYSAC_MAX_VERTICES);
     data.vertexCount = count;
     
+    float orient = GetRandomValue(0, 360);
+    data.transform = Mat2Radians(orient*MATH_DEG2RAD);
+    
     int distance = GetRandomValue(minDistance, maxDistance);
     
     // Calculate polygon vertices positions
     for (int i = 0; i < count; i++)
     {
-        data.vertices[i].x = cos(360/count*i*DEG2RAD)*distance;
-        data.vertices[i].y = sin(360/count*i*DEG2RAD)*distance;
+        data.vertices[i].x = cos(360/count*i*MATH_DEG2RAD)*distance;
+        data.vertices[i].y = sin(360/count*i*MATH_DEG2RAD)*distance;
     }
     
     // Calculate polygon faces normals
@@ -1093,13 +1119,13 @@ static void MathClamp(double *value, double min, double max)
 // Returns the cross product of a vector and a value
 static Vector2 MathCross(float a, Vector2 v)
 {
-  return (Vector2){ -a*v.y, a*v.x };
+    return (Vector2){ -a*v.y, a*v.x };
 }
 
 // Returns the cross product of two vectors
 static float MathCrossVector2(Vector2 a, Vector2 b)
 {
-  return (a.x*b.y - a.y*b.x);
+    return (a.x*b.y - a.y*b.x);
 }
 
 // Returns the len square root of a vector
@@ -1128,6 +1154,103 @@ static void MathNormalize(Vector2 *v)
 
     v->x *= ilength;
     v->y *= ilength;
+}
+
+// Creates a matrix 2x2 from a given radians value
+static Mat2 Mat2Radians(float radians)
+{
+    Mat2 matrix = { 0 };
+    
+    float c = cos(radians);
+    float s = sin(radians);
+    
+    matrix.m00 = c;
+    matrix.m01 = -s;
+    matrix.m10 = s;
+    matrix.m11 = c;
+    
+    return matrix;
+}
+
+// Creates a matrix 2x2 from specific values
+static Mat2 CreateMat2(float a, float b, float c, float d)
+{
+    Mat2 matrix = { 0 };
+    
+    matrix.m00 = a;
+    matrix.m01 = b;
+    matrix.m10 = c;
+    matrix.m11 = d;
+    
+    return matrix;
+}
+
+// Set values from radians to a created matrix 2x2
+static void Mat2Set(Mat2 *matrix, float radians)
+{
+    float c = cos(radians);
+    float s = sin(radians);
+    
+    matrix->m00 = c;
+    matrix->m01 = -s;
+    matrix->m10 = s;
+    matrix->m11 = c;
+}
+
+// Converts to absolute value every matrix values
+static void Mat2Abs(Mat2 *matrix, float radians)
+{
+    matrix->m00 = fabs(matrix->m00);
+    matrix->m01 = fabs(matrix->m01);
+    matrix->m10 = fabs(matrix->m10);
+    matrix->m11 = fabs(matrix->m11);
+}
+
+// Returns m00 and m10 as a Vector2 struct of a matrix 2x2
+static Vector2 Mat2AxisX(Mat2 matrix)
+{
+    return (Vector2){ matrix.m00, matrix.m10 };
+}
+
+// Returns m01 and m11 as a Vector2 struct of a matrix 2x2
+static Vector2 Mat2AxisY(Mat2 matrix)
+{
+    return (Vector2){ matrix.m01, matrix.m11 };
+}
+
+// Returns the transpose of a given matrix 2x2
+static Mat2 Mat2Transpose(Mat2 m)
+{
+    Mat2 matrix = m;
+    
+    matrix.m01 = m.m10;
+    matrix.m10 = m.m01;
+    
+    return matrix;
+}
+
+// Multiplies a vector by a matrix 2x2
+static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v)
+{
+    Vector2 vector = { 0 };
+    
+    vector.x = m.m00*v.x + m.m01*v.y;
+    vector.y = m.m10*v.x + m.m11*v.y;
+    
+    return vector;
+}
+
+// Multiplies two given matrices 2x2
+static Mat2 Mat2Multiply(Mat2 m1, Mat2 m2)
+{
+    Mat2 matrix = { 0 };
+    
+    matrix.m00 = m1.m00*m2.m00 + m1.m01*m2.m10;
+    matrix.m00 = m1.m00*m2.m01 + m1.m01*m2.m11;
+    matrix.m00 = m1.m10*m2.m00 + m1.m11*m2.m10;
+    matrix.m00 = m1.m10*m2.m01 + m1.m11*m2.m11;
+    
+    return matrix;
 }
 
 #endif  // PHYSAC_IMPLEMENTATION
