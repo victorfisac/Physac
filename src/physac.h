@@ -59,7 +59,11 @@
 #ifndef PHYSAC_H
 #define PHYSAC_H
 
-#include "raylib.h"
+// #define PHYSAC_STANDALONE
+
+#ifndef PHYSAC_STANDALONE
+    #include "raylib.h"
+#endif
 
 #define PHYSAC_STATIC
 #ifdef PHYSAC_STATIC
@@ -217,9 +221,10 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 #define     STATIC_DELTATIME            1.0/60.0
 #define     min(a,b)                    (((a)<(b))?(a):(b))
 #define     max(a,b)                    (((a)>(b))?(a):(b))
+#define     MATH_PI                     3.14159265358979323846
 #define     MATH_EPSILON                0.0001f
-#define     MATH_DEG2RAD                (PI/180.0f)
-#define     MATH_RAD2DEG                (180.0f/PI)
+#define     MATH_DEG2RAD                (MATH_PI/180.0f)
+#define     MATH_RAD2DEG                (180.0f/MATH_PI)
 #define     PENETRATION_ALLOWANCE       0.05f
 #define     PENETRATION_CORRECTION      0.4f
 
@@ -347,7 +352,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
         newBody->torque = 0;
         newBody->orient = 0;
         
-        newBody->mass = PI*radius*radius*density;
+        newBody->mass = MATH_PI*radius*radius*density;
         newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
         newBody->inertia = newBody->mass*radius*radius;
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
