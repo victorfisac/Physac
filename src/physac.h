@@ -247,7 +247,7 @@ static double deltaTime = STATIC_DELTATIME;                 // Delta time used f
 static double accumulator = 0;                              // Physics time step delta time accumulator
 
 static unsigned int stepsCount = 0;                         // Total physics steps processed
-static Vector2 gravityForce = { 0, 0 };                     // Physics world gravity force
+static Vector2 gravityForce = { 0 };                        // Physics world gravity force
 
 static PhysicsBody bodies[MAX_PHYSICS_BODIES];              // Physics bodies pointers array
 static unsigned int physicsBodiesCount = 0;                 // Physics world current bodies counter
@@ -345,8 +345,8 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
         // Initialize new body with generic values
         newBody->id = newId;
         newBody->position = pos;    
-        newBody->velocity = (Vector2){ 0, 0 };
-        newBody->force = (Vector2){ 0, 0 };
+        newBody->velocity = (Vector2){ 0 };
+        newBody->force = (Vector2){ 0 };
         
         newBody->angularVelocity = 0;
         newBody->torque = 0;
@@ -413,8 +413,8 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density)
         // Initialize new body with generic values
         newBody->id = newId;
         newBody->position = pos;    
-        newBody->velocity = (Vector2){ 0, 0 };
-        newBody->force = (Vector2){ 0, 0 };
+        newBody->velocity = (Vector2){ 0 };
+        newBody->force = (Vector2){ 0 };
         
         newBody->angularVelocity = 0;
         newBody->torque = 0;
@@ -424,11 +424,48 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density)
         newBody->shape.body = newBody;
         newBody->shape.vertexData = CreateRandomPolygon(25, 75);
         
-        // TODO: compute polygon mass and inertia
-        // newBody->mass = PI*radius*radius*density;
-        // newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
-        // newBody->inertia = newBody->mass*radius*radius;
-        // newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
+        // Calculate centroid and moment of inertia
+        Vector2 center = { 0 };
+        float area = 0;
+        float inertia = 0;
+        const float k = 1.0f/3.0f;
+        
+        for (int i = 0; i < newBody->shape.vertexData.vertexCount; i++)
+        {
+            // Triangle vertices, third vertex implied as (0, 0)
+            Vector2 p1 = newBody->shape.vertexData.vertices[i];
+            int ii = (((i + 1) < newBody->shape.vertexData.vertexCount) ? (i + 1) : 0);
+            Vector2 p2 = newBody->shape.vertexData.vertices[ii];
+            
+            float D = MathCrossVector2(p1, p2);
+            float triangleArea = D/2;
+            
+            area += triangleArea;
+            
+            // Use area to weight the centroid average, not just vertex position
+            center.x += triangleArea*k*(p1.x + p2.x);
+            center.y += triangleArea*k*(p1.y + p2.y);
+            
+            float intx2 = p1.x*p1.x + p2.x*p1.x + p2.x*p2.x;
+            float inty2 = p1.y*p1.y + p2.y*p1.y + p2.y*p2.y;
+            inertia += (0.25f*k*D)*(intx2 + inty2);
+        }
+        
+        center.x *= 1.0f/area;
+        center.y *= 1.0f/area;
+        
+        // Translate vertices to centroid (make the centroid (0, 0) for the polygon in model space)
+        // Note: this is not really necessary
+        for (int i = 0; i < newBody->shape.vertexData.vertexCount; i++)
+        {
+            newBody->shape.vertexData.vertices[i].x -= center.x;
+            newBody->shape.vertexData.vertices[i].y -= center.y;
+        }
+        
+        newBody->mass = density*area;
+        newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
+        newBody->inertia = density*inertia;
+        newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         
         newBody->staticFriction = 0.4f;
         newBody->dynamicFriction = 0.2f;
@@ -472,7 +509,7 @@ PHYSACDEF void DrawPhysicsBodies(void)
                 case PHYSICS_POLYGON:
                 {
                     PolygonData data = body->shape.vertexData;
-                    Vector2 position = { 0, 0 };
+                    Vector2 position = { 0 };
                     
                     for (int i = 0; i < data.vertexCount; i++)
                     {                        
@@ -744,7 +781,7 @@ static void PhysicsStep(void)
     // Clear physics bodies forces
     for (int i = 0; i < physicsBodiesCount; i++)
     {
-        bodies[i]->force = (Vector2){ 0, 0 };
+        bodies[i]->force = (Vector2){ 0 };
         bodies[i]->torque = 0;
     }
 }
@@ -785,9 +822,9 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         newManifold->bodyA = a;
         newManifold->bodyB = b;
         newManifold->penetration = 0;
-        newManifold->normal = (Vector2){ 0, 0 };
-        newManifold->contacts[0] = (Vector2){ 0, 0 };
-        newManifold->contacts[1] = (Vector2){ 0, 0 };
+        newManifold->normal = (Vector2){ 0 };
+        newManifold->contacts[0] = (Vector2){ 0 };
+        newManifold->contacts[1] = (Vector2){ 0 };
         newManifold->contactsCount = 0;
         newManifold->e = 0;
         newManifold->df = 0;
@@ -985,8 +1022,8 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
     // Early out and positional correct if both objects have infinite mass
     if (fabs(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass) <= MATH_EPSILON)
     {
-        A->velocity = (Vector2){ 0, 0 };        
-        B->velocity = (Vector2){ 0, 0 };   
+        A->velocity = (Vector2){ 0 };        
+        B->velocity = (Vector2){ 0 };   
     }
     else
     {
@@ -1072,8 +1109,7 @@ static void IntegratePhysicsVelocity(PhysicsBody body)
         body->position.y += body->velocity.y*deltaTime;
         
         body->orient += body->angularVelocity*deltaTime;
-        
-        // TODO: create set orient function for polygon shapes
+        Mat2Set(&body->shape.vertexData.transform, body->orient);
         
         IntegratePhysicsForces(body);
     }
