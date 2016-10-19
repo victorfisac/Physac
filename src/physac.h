@@ -79,10 +79,10 @@
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     COLLISION_INTERATIONS           10
+#define     COLLISION_ITERATIONS            100
 #define     MAX_TIMESTEP                    0.02
-#define     MAX_PHYSICS_BODIES              256
-#define     MAX_PHYSICS_MANIFOLDS           256
+#define     MAX_PHYSICS_BODIES              2048
+#define     MAX_PHYSICS_MANIFOLDS           2048
 #define     PHYSAC_MAX_VERTICES             8
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
@@ -204,7 +204,7 @@ PHYSACDEF void ClosePhysics(void);                      // Unitializes physics p
 #if defined(PHYSAC_IMPLEMENTATION)
 
 #ifndef PHYSAC_NO_THREADS
-    #include <pthread.h>        // Required for: pthread_t, pthread_create()
+    #include <pthread.h>                    // Required for: pthread_t, pthread_create()
 #endif
 
 #include <math.h>                           // Required for: sqrt()
@@ -221,8 +221,9 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 #define     STATIC_DELTATIME            1.0/60.0
 #define     min(a,b)                    (((a)<(b))?(a):(b))
 #define     max(a,b)                    (((a)>(b))?(a):(b))
+#define     MATH_FLT_MAX                3.402823466e+38f
 #define     MATH_PI                     3.14159265358979323846
-#define     MATH_EPSILON                0.0001f
+#define     MATH_EPSILON                0.000001f
 #define     MATH_DEG2RAD                (MATH_PI/180.0f)
 #define     MATH_RAD2DEG                (180.0f/MATH_PI)
 #define     PENETRATION_ALLOWANCE       0.05f
@@ -282,6 +283,8 @@ static float MathCrossVector2(Vector2 a, Vector2 b);                            
 static float MathLenSqr(Vector2 v);                                                 // Returns the len square root of a vector
 static float MathDot(Vector2 a, Vector2 b);                                         // Returns the dot product of two vectors
 static void MathNormalize(Vector2 *v);                                              // Returns the normalized values of a vector
+static Vector2 Vector2Add(Vector2 a, Vector2 b);                                    // Returns the sum of two given vectors
+static Vector2 Vector2Subtract(Vector2 a, Vector2 b);                               // Returns the subtract of two given vectors
 
 static Mat2 Mat2Radians(float radians);                                             // Creates a matrix 2x2 from a given radians value
 static Mat2 CreateMat2(float a, float b, float c, float d);                         // Creates a matrix 2x2 from specific values
@@ -422,7 +425,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density)
         
         newBody->shape.type = PHYSICS_POLYGON;
         newBody->shape.body = newBody;
-        newBody->shape.vertexData = CreateRandomPolygon(25, 75);
+        newBody->shape.vertexData = CreateRandomPolygon(25, 200);
         
         // Calculate centroid and moment of inertia
         Vector2 center = { 0 };
@@ -516,10 +519,10 @@ PHYSACDEF void DrawPhysicsBodies(void)
                         // Draw vertex face with lines
                         int ii = (((i + 1) < data.vertexCount) ? (i + 1) : 0);
                         Vector2 vertexA = Mat2MultiplyVector2(data.transform, data.vertices[i]);
-                        Vector2 startPosition = { body->position.x + vertexA.x, body->position.y + vertexA.y };
+                        Vector2 startPosition = Vector2Add(body->position, vertexA);
                         
                         Vector2 vertexB = Mat2MultiplyVector2(data.transform, data.vertices[ii]);
-                        Vector2 endPosition = { body->position.x + vertexB.x, body->position.y + vertexB.y };
+                        Vector2 endPosition = Vector2Add(body->position, vertexB);
                         
                         DrawLineV(startPosition, endPosition, PHYSAC_SHAPES_COLOR);
                         
@@ -528,8 +531,7 @@ PHYSACDEF void DrawPhysicsBodies(void)
                         
                         startPosition = Mat2MultiplyVector2(data.transform, startPosition);
                         
-                        startPosition.x += body->position.x;
-                        startPosition.y += body->position.y;
+                        startPosition = Vector2Add(startPosition, body->position);
                         
                         // Draw vertex normals with lines             
                         vertexA = Mat2MultiplyVector2(data.transform, data.normals[i]);
@@ -537,9 +539,6 @@ PHYSACDEF void DrawPhysicsBodies(void)
                         endPosition.y = startPosition.y + vertexA.y*PHYSAC_CONTACTS_NORMAL;
                         
                         DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
-                        
-                        // DrawLine(body->position.x - 2, body->position.y, body->position.x + 2, body->position.y, WHITE);
-                        // DrawLine(body->position.x, body->position.y - 2, body->position.x, body->position.y + 2, WHITE);
                     }
                 } break;
             }
@@ -573,12 +572,6 @@ PHYSACDEF void DrawPhysicsContacts(void)
 PHYSACDEF void DrawPhysicsInfo(void)
 {
     DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, PHYSAC_INFO_COLOR);
-    
-    for (int i = 0; i < physicsBodiesCount; i++)
-    {
-        PhysicsBody b = bodies[i];
-        DrawText(FormatText("id: %i\nvelocity: %02f, %02f\nposition: %02f, %02f\nangular: %02f\n", b->id, b->velocity.x, b->velocity.y, b->position.x, b->position.y, b->angularVelocity), 10, 30 + i*15*5, 10, PHYSAC_INFO_COLOR);
-    }
 }
 
 // Unitializes and destroys a physics body
@@ -664,7 +657,7 @@ static PolygonData CreateRandomPolygon(int minDistance, int maxDistance)
     for (int i = 0; i < count; i++)
     {
         int ii = (((i + 1) < count) ? (i + 1) : 0);
-        Vector2 face = { data.vertices[ii].x - data.vertices[i].x, data.vertices[ii].y - data.vertices[i].y };
+        Vector2 face = Vector2Subtract(data.vertices[ii], data.vertices[i]);
         
         data.normals[i] = (Vector2){ face.y, -face.x };
         MathNormalize(&data.normals[i]);
@@ -767,7 +760,7 @@ static void PhysicsStep(void)
     for (int i = 0; i < physicsManifoldsCount; i++) InitializePhysicsManifolds(contacts[i]);
     
     // Integrate physics collisions impulses to solve collisions
-    for (int i = 0; i < COLLISION_INTERATIONS; i++)
+    for (int i = 0; i < COLLISION_ITERATIONS; i++)
     {
         for (int j = 0; j < physicsManifoldsCount; j++) IntegratePhysicsImpulses(contacts[j]);
     }
@@ -915,16 +908,13 @@ static void SolvePhysicsCircleToCircle(PhysicsManifold manifold)
     PhysicsBody B = manifold->bodyB;
     
     // Calculate translational vector, which is normal
-    Vector2 normal = { B->position.x - A->position.x, B->position.y - A->position.y };
+    Vector2 normal = Vector2Subtract(B->position, A->position);
     
     float dist_sqr = MathLenSqr(normal);
     float radius = A->shape.radius + B->shape.radius;
     
     // Check if circles are not in contact
-    if (dist_sqr >= radius*radius)
-    {
-        manifold->contactsCount = 0;
-    }
+    if (dist_sqr >= radius*radius) manifold->contactsCount = 0;
     else
     {
         float distance = sqrt(dist_sqr);
@@ -948,13 +938,111 @@ static void SolvePhysicsCircleToCircle(PhysicsManifold manifold)
 // Solves collision between a circle to a polygon shape physics bodies
 static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold)
 {
-    // TODO: implement it
+    PhysicsBody A = manifold->bodyA;
+    PhysicsBody B = manifold->bodyB;
+    
+    manifold->contactsCount = 0;
+    
+    // Transform circle center to polygon transform space
+    Vector2 center = A->position;
+    center = Mat2MultiplyVector2(Mat2Transpose(B->shape.vertexData.transform), Vector2Subtract(center, B->position));
+    
+    // Find edge with minimum penetration
+    // It is the same concept as using support points in SolvePhysicsPolygonToPolygon
+    float separation = -MATH_FLT_MAX;
+    int faceNormal = 0;
+    PolygonData vertexData = B->shape.vertexData;
+    
+    for (int i = 0; i < B->shape.vertexData.vertexCount; i++)
+    {
+        float s = MathDot(vertexData.normals[i], Vector2Subtract(center, vertexData.vertices[i]));
+        
+        if (s > A->shape.radius) return;
+        
+        if (s > separation)
+        {
+            separation = s;
+            faceNormal = i;
+        }
+    }
+    
+    // Grab face's vertices
+    Vector2 v1 = vertexData.vertices[faceNormal];
+    int ii = (((faceNormal + 1) < vertexData.vertexCount) ? (faceNormal + 1) : 0);
+    Vector2 v2 = vertexData.vertices[ii];
+    
+    // Check to see if center is within polygon
+    if (separation < MATH_EPSILON)
+    {
+        manifold->contactsCount = 1;
+        Vector2 normal = Mat2MultiplyVector2(vertexData.transform, vertexData.normals[faceNormal]);
+        manifold->normal = (Vector2){ -normal.x, -normal.y };
+        manifold->contacts[0] = (Vector2){ manifold->normal.x*A->shape.radius + A->position.x, manifold->normal.y*A->shape.radius + A->position.y };
+        manifold->penetration = A->shape.radius;
+        return;
+    }
+    
+    // Determine which voronoi region of the edge center of circle lies within
+    float dot1 = MathDot((Vector2){ center.x - v1.x, center.y - v1.y }, (Vector2){ v2.x - v1.x, v2.y - v1.y });
+    float dot2 = MathDot((Vector2){ center.x - v2.x, center.y - v2.y }, (Vector2){ v1.x - v2.x, v1.y - v2.y });
+    manifold->penetration = A->shape.radius - separation;
+  
+    if (dot1 <= 0) // Closest to v1
+    {
+        Vector2 c = Vector2Subtract(center, v1);
+        float distSqr = MathDot(c, c);
+        
+        if (distSqr > A->shape.radius*A->shape.radius) return;
+        
+        manifold->contactsCount = 1;
+        Vector2 normal = Vector2Subtract(v1, center);
+        normal = Mat2MultiplyVector2(vertexData.transform, normal);
+        MathNormalize(&normal);
+        manifold->normal = normal;
+        v1 = Mat2MultiplyVector2(vertexData.transform, v1);
+        v1 = Vector2Add(v1, B->position);
+        manifold->contacts[0] = v1;
+    }
+    else if (dot2 <= 0) // Closest to v2
+    {
+        Vector2 c = { center.x - v2.x, center.y - v2.y };
+        float distSqr = MathDot(c, c);
+        
+        if (distSqr > A->shape.radius*A->shape.radius) return;
+        
+        manifold->contactsCount = 1;
+        Vector2 normal = Vector2Subtract(v2, center);
+        v2 = Mat2MultiplyVector2(vertexData.transform, v2);
+        v2 = Vector2Add(v2, B->position);
+        manifold->contacts[0] = v2;
+        normal = Mat2MultiplyVector2(vertexData.transform, normal);
+        MathNormalize(&normal);
+        manifold->normal = normal;
+    }
+    else // Closest to face
+    {
+        Vector2 normal = vertexData.normals[faceNormal];
+        if (MathDot(Vector2Subtract(center, v1), normal) > A->shape.radius) return;
+        
+        normal = Mat2MultiplyVector2(vertexData.transform, normal);
+        manifold->normal = (Vector2){ -normal.x, -normal.y };
+        manifold->contacts[0] = (Vector2){ manifold->normal.x*A->shape.radius + A->position.x, manifold->normal.y*A->shape.radius + A->position.y };
+        manifold->contactsCount = 1;
+    }
 }
 
 // Solves collision between a polygon to a circle shape physics bodies
 static void SolvePhysicsPolygonToCircle(PhysicsManifold manifold)
 {
-    // TODO: implement it
+    PhysicsBody A = manifold->bodyA;
+    PhysicsBody B = manifold->bodyB;
+    
+    manifold->bodyA = B;
+    manifold->bodyB = A;
+    SolvePhysicsCircleToPolygon(manifold);
+    
+    manifold->normal.x *= -1;
+    manifold->normal.y *= -1;
 }
 
 // Solves collision between two polygons shape physics bodies
@@ -997,13 +1085,13 @@ static void InitializePhysicsManifolds(PhysicsManifold manifold)
     for (int i = 0; i < 2; i++)
     {
         // Caculate radius from center of mass to contact
-        Vector2 ra = { manifold->contacts[i].x - A->position.x, manifold->contacts[i].y - A->position.y };
-        Vector2 rb = { manifold->contacts[i].x - B->position.x, manifold->contacts[i].y - B->position.y };
+        Vector2 ra = Vector2Subtract(manifold->contacts[i], A->position);
+        Vector2 rb = Vector2Subtract(manifold->contacts[i], B->position);
         
         Vector2 crossB = MathCross(B->angularVelocity, rb);
         Vector2 crossA = MathCross(A->angularVelocity, ra);
         
-        Vector2 rv;
+        Vector2 rv = { 0 };
         rv.x = B->velocity.x + crossB.x - A->velocity.x - crossA.x;
         rv.y = B->velocity.y + crossB.y - A->velocity.y - crossA.y;
         
@@ -1030,11 +1118,11 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
         for (int i = 0; i < manifold->contactsCount; i++)
         {
             // Calculate radius from center of mass to contact
-            Vector2 ra = { manifold->contacts[i].x - A->position.x, manifold->contacts[i].y - A->position.y };
-            Vector2 rb = { manifold->contacts[i].x - B->position.x, manifold->contacts[i].y - B->position.y };
+            Vector2 ra = Vector2Subtract(manifold->contacts[i], A->position);
+            Vector2 rb = Vector2Subtract(manifold->contacts[i], B->position);
             
             // Calculate relative velocity
-            Vector2 rv;
+            Vector2 rv = { 0 };
             rv.x = B->velocity.x + MathCross(B->angularVelocity, rb).x - A->velocity.x - MathCross(A->angularVelocity, ra).x;
             rv.y = B->velocity.y + MathCross(B->angularVelocity, rb).y - A->velocity.y - MathCross(A->angularVelocity, ra).y;
             
@@ -1195,6 +1283,18 @@ static void MathNormalize(Vector2 *v)
 
     v->x *= ilength;
     v->y *= ilength;
+}
+
+// Returns the sum of two given vectors
+static Vector2 Vector2Add(Vector2 a, Vector2 b)
+{
+    return (Vector2){ a.x + b.x, a.y + b.y };
+}
+
+// Returns the subtract of two given vectors
+static Vector2 Vector2Subtract(Vector2 a, Vector2 b)
+{
+    return (Vector2){ a.x - b.x, a.y - b.y };
 }
 
 // Creates a matrix 2x2 from a given radians value

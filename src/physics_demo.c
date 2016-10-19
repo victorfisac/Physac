@@ -13,7 +13,8 @@
 #include "physac.h"
 #include "stdio.h"
 
-#define     FORCE       100
+#define     GRAVITY     (Vector2){ 0, 9.81f/1000 }
+#define     FORCE       10000
 #define     TORQUE      10000
 
 int main()
@@ -26,14 +27,15 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "raylib [physac] - demo");
+    InitWindow(screenWidth, screenHeight, "Physac [raylib] - demo");
     SetTargetFPS(60);
     
-    InitPhysics((Vector2){ 0.0f, 0 });     // TODO: check if real world gravity value gives good results
+    InitPhysics(GRAVITY);
     
     PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 30);
     PhysicsBody B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2 + 100, screenHeight/2 - 70 }, 2, 30);
-    PhysicsBody C = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2 + 300, screenHeight/2 + 100 }, 10);
+    PhysicsBody C = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 + 100 }, 10);
+    C->enabled = false;
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -43,6 +45,16 @@ int main()
         //----------------------------------------------------------------------------------        
         if (IsKeyPressed('F')) frameStepping = !frameStepping;
         if (IsKeyDown(' ')) canStep = true;
+        if (IsKeyPressed('R'))
+        {
+            ClosePhysics();
+            InitPhysics(GRAVITY);
+            
+            PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 30);
+            PhysicsBody B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2 + 100, screenHeight/2 - 70 }, 2, 30);
+            PhysicsBody C = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 + 100 }, 10);
+            C->enabled = false;
+        }
         
         if (IsKeyDown('D')) B->force.x += FORCE;
         else if (IsKeyDown('A')) B->force.x -= FORCE;
@@ -50,7 +62,7 @@ int main()
         if (IsKeyDown('S')) B->force.y += FORCE;
         else if (IsKeyDown('W')) B->force.y -= FORCE;
         
-        if (IsKeyDown('T')) B->torque += TORQUE;        
+        if (IsKeyDown('T')) B->torque += TORQUE;
         //----------------------------------------------------------------------------------
         
         // Draw
@@ -61,7 +73,7 @@ int main()
             
             DrawPhysicsBodies();
             
-            DrawPhysicsContacts();
+            // DrawPhysicsContacts();
             
             DrawPhysicsInfo();
             
