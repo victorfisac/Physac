@@ -25,6 +25,7 @@ int main()
     int screenWidth = 800;
     int screenHeight = 450;
 
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "raylib [physac] - demo");
     SetTargetFPS(60);
     
@@ -49,8 +50,7 @@ int main()
         if (IsKeyDown('S')) B->force.y += FORCE;
         else if (IsKeyDown('W')) B->force.y -= FORCE;
         
-        if (IsKeyDown('T')) B->torque += TORQUE;
-        
+        if (IsKeyDown('T')) B->torque += TORQUE;        
         //----------------------------------------------------------------------------------
         
         // Draw
