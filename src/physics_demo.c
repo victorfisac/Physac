@@ -44,14 +44,14 @@ int main()
         //----------------------------------------------------------------------------------        
         if (IsMouseButtonPressed(0)) CreatePhysicsBodyPolygon(5, GetMousePosition(), 10);
         else if (IsMouseButtonPressed(1)) CreatePhysicsBodyCircle(GetMousePosition(), 2, GetRandomValue(20, 60));
-    
+
         if (IsKeyPressed('F')) frameStepping = !frameStepping;
         if (IsKeyDown(' ')) canStep = true;
         if (IsKeyPressed('R'))
         {
             ClosePhysics();
             InitPhysics(GRAVITY);
-            
+
             A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
             A->enabled = false;
 
