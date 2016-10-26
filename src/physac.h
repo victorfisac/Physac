@@ -78,7 +78,7 @@
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     COLLISION_ITERATIONS            100
+#define     COLLISION_ITERATIONS            10
 #define     MAX_TIMESTEP                    0.02
 #define     MAX_PHYSICS_BODIES              2048
 #define     MAX_PHYSICS_MANIFOLDS           2048
@@ -172,8 +172,9 @@ typedef struct PhysicsManifoldData {
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 PHYSACDEF void InitPhysics(Vector2 gravity);            // Initializes physics values, pointers and creates physics loop thread
-PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);        // Creates a new physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density);                     // Creates a new physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);        // Creates a new circle physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density);     // Creates a new rectangle physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int vertex, Vector2 pos, float density);         // Creates a new polygon physics body with generic parameters
 PHYSACDEF void DrawPhysicsBodies(void);                 // Draws all created physics bodies shapes
 PHYSACDEF void DrawPhysicsContacts(void);               // Draws all calculated physics contacts points and its normals
 PHYSACDEF void DrawPhysicsInfo(void);                   // Draws debug information about physics states and values
@@ -242,7 +243,8 @@ static unsigned int physicsManifoldsCount = 0;              // Physics world cur
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static PolygonData CreateRandomPolygon(int minDistance, int maxDistance);           // Creates a random polygon shape with max vertex distance from polygon pivot
+static PolygonData CreateRandomPolygon(int count, int minDistance, int maxDistance);        // Creates a random polygon shape with max vertex distance from polygon pivot
+static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max);                // Creates a rectangle polygon shape based on a min and max positions
 static void *PhysicsLoop(void *arg);                                                // Physics loop thread function
 static void PhysicsStep(void);                                                      // Physics steps calculations (dynamics, collisions and position corrections)
 static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b);         // Creates a new physics manifold to solve collision
@@ -298,7 +300,7 @@ PHYSACDEF void InitPhysics(Vector2 gravity)
     #endif
 }
 
-// Creates a new physics body with generic parameters
+// Creates a new circle physics body with generic parameters
 PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius)
 {
     PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
@@ -361,8 +363,8 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
     return newBody;
 }
 
-// Creates a new physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density)
+// Creates a new rectangle physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density)
 {
     PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
     usedMemory += sizeof(PhysicsBodyData);
@@ -403,7 +405,109 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float density)
         newBody->orient = 0;
         newBody->shape.type = PHYSICS_POLYGON;
         newBody->shape.body = newBody;
-        newBody->shape.vertexData = CreateRandomPolygon(25, 75);
+        newBody->shape.vertexData = CreateRectanglePolygon(min, max);
+
+        // Calculate centroid and moment of inertia
+        Vector2 center = { 0 };
+        float area = 0;
+        float inertia = 0;
+        const float k = 1.0f/3.0f;
+
+        for (int i = 0; i < newBody->shape.vertexData.vertexCount; i++)
+        {
+            // Triangle vertices, third vertex implied as (0, 0)
+            Vector2 p1 = newBody->shape.vertexData.vertices[i];
+            int ii = (((i + 1) < newBody->shape.vertexData.vertexCount) ? (i + 1) : 0);
+            Vector2 p2 = newBody->shape.vertexData.vertices[ii];
+
+            float D = MathCrossVector2(p1, p2);
+            float triangleArea = D/2;
+
+            area += triangleArea;
+
+            // Use area to weight the centroid average, not just vertex position
+            center.x += triangleArea*k*(p1.x + p2.x);
+            center.y += triangleArea*k*(p1.y + p2.y);
+
+            float intx2 = p1.x*p1.x + p2.x*p1.x + p2.x*p2.x;
+            float inty2 = p1.y*p1.y + p2.y*p1.y + p2.y*p2.y;
+            inertia += (0.25f*k*D)*(intx2 + inty2);
+        }
+
+        center.x *= 1.0f/area;
+        center.y *= 1.0f/area;
+
+        // Translate vertices to centroid (make the centroid (0, 0) for the polygon in model space)
+        // Note: this is not really necessary
+        for (int i = 0; i < newBody->shape.vertexData.vertexCount; i++)
+        {
+            newBody->shape.vertexData.vertices[i].x -= center.x;
+            newBody->shape.vertexData.vertices[i].y -= center.y;
+        }
+
+        newBody->mass = density*area;
+        newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
+        newBody->inertia = density*inertia;
+        newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
+        newBody->staticFriction = 0.4f;
+        newBody->dynamicFriction = 0.2f;
+        newBody->restitution = 0.2;
+        newBody->useGravity = true;
+
+        // Add new body to bodies pointers array and update bodies count
+        bodies[physicsBodiesCount] = newBody;
+        physicsBodiesCount++;
+        
+        TraceLog(WARNING, "[PHYSAC] created polygon physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+    }
+    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
+    
+    return newBody;
+}
+
+// Creates a new polygon physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, Vector2 pos, float density)
+{
+    PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
+    usedMemory += sizeof(PhysicsBodyData);
+
+    int newId = -1;
+    for (int i = 0; i < MAX_PHYSICS_BODIES; i++)
+    {
+        int currentId = i;
+
+        // Check if current id already exist in other physics body
+        for (int k = 0; k < physicsBodiesCount; k++)
+        {
+            if (bodies[k]->id == currentId)
+            {
+                currentId++;
+                break;
+            }
+        }
+
+        // If it is not used, use it as new physics body id
+        if (currentId == i)
+        {
+            newId = i;
+            break;
+        }
+    }
+
+    if (newId != -1)
+    {
+        // Initialize new body with generic values
+        newBody->id = newId;
+        newBody->enabled = true;
+        newBody->position = pos;    
+        newBody->velocity = (Vector2){ 0 };
+        newBody->force = (Vector2){ 0 };
+        newBody->angularVelocity = 0;
+        newBody->torque = 0;
+        newBody->orient = 0;
+        newBody->shape.type = PHYSICS_POLYGON;
+        newBody->shape.body = newBody;
+        newBody->shape.vertexData = CreateRandomPolygon(count, 25, 75);
 
         // Calculate centroid and moment of inertia
         Vector2 center = { 0 };
@@ -603,11 +707,9 @@ PHYSACDEF void ClosePhysics(void)
 // Module Internal Functions Definition
 //----------------------------------------------------------------------------------
 // Creates a random polygon shape with max vertex distance from polygon pivot
-static PolygonData CreateRandomPolygon(int minDistance, int maxDistance)
+static PolygonData CreateRandomPolygon(int count, int minDistance, int maxDistance)
 {
     PolygonData data = { 0 };
-
-    unsigned int count = GetRandomValue(3, PHYSAC_MAX_VERTICES);
     data.vertexCount = count;
 
     float orient = GetRandomValue(0, 360);
@@ -616,16 +718,42 @@ static PolygonData CreateRandomPolygon(int minDistance, int maxDistance)
     int distance = GetRandomValue(minDistance, maxDistance);
 
     // Calculate polygon vertices positions
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < data.vertexCount; i++)
     {
         data.vertices[i].x = cos(360/count*i*MATH_DEG2RAD)*distance;
         data.vertices[i].y = sin(360/count*i*MATH_DEG2RAD)*distance;
     }
 
     // Calculate polygon faces normals
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < data.vertexCount; i++)
     {
         int ii = (((i + 1) < count) ? (i + 1) : 0);
+        Vector2 face = Vector2Subtract(data.vertices[ii], data.vertices[i]);
+        
+        data.normals[i] = (Vector2){ face.y, -face.x };
+        MathNormalize(&data.normals[i]);
+    }
+
+    return data;
+}
+
+// Creates a rectangle polygon shape based on a min and max positions
+static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max)
+{
+    PolygonData data = { 0 };
+
+    data.vertexCount = 4;
+
+    // Calculate polygon vertices positions
+    data.vertices[0] = (Vector2){ min.x + max.x, min.y };
+    data.vertices[1] = (Vector2){ min.x + max.x, min.y + max.y };
+    data.vertices[2] = (Vector2){ min.x, min.y + max.y };
+    data.vertices[3] = (Vector2){ min.x, min.y };
+
+    // Calculate polygon faces normals
+    for (int i = 0; i < data.vertexCount; i++)
+    {
+        int ii = (((i + 1) < data.vertexCount) ? (i + 1) : 0);
         Vector2 face = Vector2Subtract(data.vertices[ii], data.vertices[i]);
         
         data.normals[i] = (Vector2){ face.y, -face.x };
@@ -657,7 +785,7 @@ static void *PhysicsLoop(void *arg)
         accumulator += currentTime - startTime;
 
         // Clamp accumulator to max time step to avoid bad performance
-        MathClamp(&accumulator, 0.0, MAX_TIMESTEP);
+        MathClamp(&accumulator, 0, MAX_TIMESTEP);
 
         // Record the starting of this frame
         startTime = currentTime;
@@ -1127,7 +1255,7 @@ static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB)
     float d1 = MathDot(n, *faceA) - c;
     float d2 = MathDot(n, *faceB) - c;
 
-    // If negative (behind plane) clip (TODO: check if it is correct)
+    // If negative (behind plane)
     if (d1 <= 0) out[sp++] = *faceA;
     if (d2 <= 0) out[sp++] = *faceB;
 
@@ -1347,13 +1475,20 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 
         // Apply impulse to each physics body
         Vector2 impulse = { manifold->normal.x*j, manifold->normal.y*j };
-        A->velocity.x += A->inverseMass*(-impulse.x);
-        A->velocity.y += A->inverseMass*(-impulse.y);
-        A->angularVelocity += A->inverseInertia*MathCrossVector2(ra, (Vector2){ -impulse.x, -impulse.y });
 
-        B->velocity.x += B->inverseMass*(impulse.x);
-        B->velocity.y += B->inverseMass*(impulse.y);
-        B->angularVelocity += B->inverseInertia*MathCrossVector2(rb, impulse);
+        if (A->enabled)
+        {
+            A->velocity.x += A->inverseMass*(-impulse.x);
+            A->velocity.y += A->inverseMass*(-impulse.y);
+            A->angularVelocity += A->inverseInertia*MathCrossVector2(ra, (Vector2){ -impulse.x, -impulse.y });
+        }
+
+        if (B->enabled)
+        {
+            B->velocity.x += B->inverseMass*(impulse.x);
+            B->velocity.y += B->inverseMass*(impulse.y);
+            B->angularVelocity += B->inverseInertia*MathCrossVector2(rb, impulse);
+        }
 
         // Apply friction impulse to each physics body
         rv.x = B->velocity.x + MathCross(B->angularVelocity, rb).x - A->velocity.x - MathCross(A->angularVelocity, ra).x;
@@ -1378,20 +1513,26 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
         else tangentImpulse = (Vector2){ t.x*-j*manifold->df, t.y*-j*manifold->df };
 
         // Apply friction impulse
-        A->velocity.x += A->inverseMass*(-tangentImpulse.x);
-        A->velocity.y += A->inverseMass*(-tangentImpulse.y);
-        A->angularVelocity += A->inverseInertia*MathCrossVector2(ra, (Vector2){ -tangentImpulse.x, -tangentImpulse.y });
+        if (A->enabled)
+        {
+            A->velocity.x += A->inverseMass*(-tangentImpulse.x);
+            A->velocity.y += A->inverseMass*(-tangentImpulse.y);
+            A->angularVelocity += A->inverseInertia*MathCrossVector2(ra, (Vector2){ -tangentImpulse.x, -tangentImpulse.y });
+        }
 
-        B->velocity.x += B->inverseMass*(tangentImpulse.x);
-        B->velocity.y += B->inverseMass*(tangentImpulse.y);
-        B->angularVelocity += B->inverseInertia*MathCrossVector2(rb, tangentImpulse);
+        if (B->enabled)
+        {
+            B->velocity.x += B->inverseMass*(tangentImpulse.x);
+            B->velocity.y += B->inverseMass*(tangentImpulse.y);
+            B->angularVelocity += B->inverseInertia*MathCrossVector2(rb, tangentImpulse);
+        }
     }
 }
 
 // Integrates physics velocity into position and forces
 static void IntegratePhysicsVelocity(PhysicsBody body)
 {
-    if (body->inverseMass == 0 || !body->enabled) return;
+    // if (body->inverseMass == 0 || !body->enabled) return;
 
     body->position.x += body->velocity.x*deltaTime;
     body->position.y += body->velocity.y*deltaTime;

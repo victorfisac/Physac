@@ -13,7 +13,7 @@
 #include "physac.h"
 #include "stdio.h"
 
-#define     GRAVITY     (Vector2){ 0, 0 }
+#define     GRAVITY     (Vector2){ 0, 9.81f/100 }
 #define     FORCE       10000
 #define     TORQUE      10000
 
@@ -30,10 +30,11 @@ int main()
 
     InitPhysics(GRAVITY);
 
-    PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 30);
-    PhysicsBody B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2 + 100, screenHeight/2 - 70 }, 2, 30);
-    PhysicsBody C = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2 + 250, screenHeight/2 - 100 }, 10);
-    PhysicsBody D = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2 + 250, screenHeight/2 + 100 }, 10);
+    PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
+    A->enabled = false;
+
+    PhysicsBody C = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight - 50 }, (Vector2){ -500, -50 }, (Vector2){ 500, 50 }, 10);
+    C->enabled = false;
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -41,24 +42,22 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------        
+        if (IsMouseButtonPressed(0)) CreatePhysicsBodyPolygon(5, GetMousePosition(), 10);
+        else if (IsMouseButtonPressed(1)) CreatePhysicsBodyCircle(GetMousePosition(), 2, GetRandomValue(20, 60));
+    
         if (IsKeyPressed('F')) frameStepping = !frameStepping;
         if (IsKeyDown(' ')) canStep = true;
         if (IsKeyPressed('R'))
         {
             ClosePhysics();
             InitPhysics(GRAVITY);
+            
+            A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
+            A->enabled = false;
 
-            C = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2 + 250, screenHeight/2 - 100 }, 10);
-            D = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2 + 250, screenHeight/2 + 100 }, 10);
+            C = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight - 50 }, (Vector2){ -500, -50 }, (Vector2){ 500, 50 }, 10);
+            C->enabled = false;
         }
-
-        if (IsKeyDown('D')) C->force.x += FORCE;
-        else if (IsKeyDown('A')) C->force.x -= FORCE;
-
-        if (IsKeyDown('S')) C->force.y += FORCE;
-        else if (IsKeyDown('W')) C->force.y -= FORCE;
-
-        if (IsKeyDown('T')) C->torque += TORQUE;
         //----------------------------------------------------------------------------------
 
         // Draw
