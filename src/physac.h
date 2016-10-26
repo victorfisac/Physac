@@ -60,7 +60,6 @@
 #define PHYSAC_H
 
 // #define PHYSAC_STANDALONE
-
 #ifndef PHYSAC_STANDALONE
     #include "raylib.h"
 #endif
@@ -1439,32 +1438,32 @@ static double GetCurrentTime(void)
 }
 
 // Clamp a value in a range
-static void MathClamp(double *value, double min, double max)
+static inline void MathClamp(double *value, double min, double max)
 {
     if (*value < min) *value = min;
     else if (*value > max) *value = max;
 }
 
 // Returns the cross product of a vector and a value
-static Vector2 MathCross(float a, Vector2 v)
+static inline Vector2 MathCross(float a, Vector2 v)
 {
     return (Vector2){ -a*v.y, a*v.x };
 }
 
 // Returns the cross product of two vectors
-static float MathCrossVector2(Vector2 a, Vector2 b)
+static inline float MathCrossVector2(Vector2 a, Vector2 b)
 {
     return (a.x*b.y - a.y*b.x);
 }
 
 // Returns the len square root of a vector
-static float MathLenSqr(Vector2 v)
+static inline float MathLenSqr(Vector2 v)
 {
     return (v.x*v.x + v.y*v.y);
 }
 
 // Returns the dot product of two vectors
-static float MathDot(Vector2 a, Vector2 b)
+static inline float MathDot(Vector2 a, Vector2 b)
 {
     return (a.x*b.x + a.y*b.y);
 }
@@ -1486,19 +1485,19 @@ static void MathNormalize(Vector2 *v)
 }
 
 // Returns the sum of two given vectors
-static Vector2 Vector2Add(Vector2 a, Vector2 b)
+static inline Vector2 Vector2Add(Vector2 a, Vector2 b)
 {
     return (Vector2){ a.x + b.x, a.y + b.y };
 }
 
 // Returns the subtract of two given vectors
-static Vector2 Vector2Subtract(Vector2 a, Vector2 b)
+static inline Vector2 Vector2Subtract(Vector2 a, Vector2 b)
 {
     return (Vector2){ a.x - b.x, a.y - b.y };
 }
 
 // Creates a matrix 2x2 from a given radians value
-static Mat2 Mat2Radians(float radians)
+static inline Mat2 Mat2Radians(float radians)
 {
     Mat2 matrix = { 0 };
 
@@ -1514,7 +1513,7 @@ static Mat2 Mat2Radians(float radians)
 }
 
 // Creates a matrix 2x2 from specific values
-static Mat2 CreateMat2(float a, float b, float c, float d)
+static inline Mat2 CreateMat2(float a, float b, float c, float d)
 {
     Mat2 matrix = { 0 };
 
@@ -1548,19 +1547,19 @@ static void Mat2Abs(Mat2 *matrix, float radians)
 }
 
 // Returns m00 and m10 as a Vector2 struct of a matrix 2x2
-static Vector2 Mat2AxisX(Mat2 matrix)
+static inline Vector2 Mat2AxisX(Mat2 matrix)
 {
     return (Vector2){ matrix.m00, matrix.m10 };
 }
 
 // Returns m01 and m11 as a Vector2 struct of a matrix 2x2
-static Vector2 Mat2AxisY(Mat2 matrix)
+static inline Vector2 Mat2AxisY(Mat2 matrix)
 {
     return (Vector2){ matrix.m01, matrix.m11 };
 }
 
 // Returns the transpose of a given matrix 2x2
-static Mat2 Mat2Transpose(Mat2 m)
+static inline Mat2 Mat2Transpose(Mat2 m)
 {
     Mat2 matrix = { 0 };
 
@@ -1573,7 +1572,7 @@ static Mat2 Mat2Transpose(Mat2 m)
 }
 
 // Multiplies a vector by a matrix 2x2
-static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v)
+static inline Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v)
 {
     Vector2 vector = { 0 };
 
@@ -1584,7 +1583,7 @@ static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v)
 }
 
 // Multiplies two given matrices 2x2
-static Mat2 Mat2Multiply(Mat2 m1, Mat2 m2)
+static inline Mat2 Mat2Multiply(Mat2 m1, Mat2 m2)
 {
     Mat2 matrix = { 0 };
 
