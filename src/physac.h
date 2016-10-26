@@ -225,6 +225,9 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
+#ifndef PHYSAC_NO_THREADS
+    static pthread_t physicsThreadId;                       // Physics thread id
+#endif
 static unsigned int usedMemory = 0;                         // Total allocated dynamic memory
 static bool frameStepping = false;                          // Physics frame stepping state
 static bool canStep = false;                                // Physics frame stepping input state
@@ -295,8 +298,7 @@ PHYSACDEF void InitPhysics(Vector2 gravity)
     #ifndef PHYSAC_NO_THREADS
         // NOTE: if defined, user will need to create a thread for PhysicsThread function manually
         // Create physics thread using POSIXS thread libraries
-        pthread_t tid;
-        pthread_create(&tid, NULL, &PhysicsLoop, NULL);
+        pthread_create(&physicsThreadId, NULL, &PhysicsLoop, NULL);
     #endif
 }
 
@@ -647,6 +649,12 @@ PHYSACDEF void DrawPhysicsContacts(void)
     }
 }
 
+// Draws debug information about physics states and values
+PHYSACDEF void DrawPhysicsInfo(void)
+{
+    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, PHYSAC_INFO_COLOR);
+}
+
 // Unitializes and destroys a physics body
 PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
 {
@@ -697,6 +705,10 @@ PHYSACDEF void ClosePhysics(void)
 
     // Unitialize physics manifolds dynamic memory allocations
     for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
+
+    #ifndef PHYSAC_NO_THREADS
+        pthread_join(physicsThreadId, NULL);
+    #endif
 
     if (physicsBodiesCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated bodies [USED RAM: %i bytes]", physicsBodiesCount, usedMemory);
     else if (physicsManifoldsCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated manifolds [USED RAM: %i bytes]", physicsManifoldsCount, usedMemory);
