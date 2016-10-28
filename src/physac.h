@@ -616,20 +616,6 @@ PHYSACDEF void DrawPhysicsBodies(void)
                         Vector2 endPosition = Vector2Add(body->position, vertexB);
 
                         DrawLineV(startPosition, endPosition, PHYSAC_SHAPES_COLOR);
-
-                        /*
-                        // Draw vertex normals with lines      
-                        startPosition.x = data.vertices[i].x + (data.vertices[ii].x - data.vertices[i].x)/2;
-                        startPosition.y = data.vertices[i].y + (data.vertices[ii].y - data.vertices[i].y)/2;
-
-                        startPosition = Mat2MultiplyVector2(data.transform, startPosition);
-                        startPosition = Vector2Add(startPosition, body->position);
-
-                        vertexA = Mat2MultiplyVector2(data.transform, data.normals[i]);
-                        endPosition.x = startPosition.x + vertexA.x*PHYSAC_CONTACTS_NORMAL;
-                        endPosition.y = startPosition.y + vertexA.y*PHYSAC_CONTACTS_NORMAL;
-
-                        DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR); */
                     }
                 } break;
                 default: break;
