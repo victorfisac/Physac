@@ -78,7 +78,7 @@
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     COLLISION_ITERATIONS            10
+#define     COLLISION_ITERATIONS            7
 #define     MAX_TIMESTEP                    0.02
 #define     MAX_PHYSICS_BODIES              2048
 #define     MAX_PHYSICS_MANIFOLDS           2048
@@ -171,15 +171,16 @@ typedef struct PhysicsManifoldData {
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
-PHYSACDEF void InitPhysics(Vector2 gravity);            // Initializes physics values, pointers and creates physics loop thread
-PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);        // Creates a new circle physics body with generic parameters
+PHYSACDEF void InitPhysics(Vector2 gravity);                                                                // Initializes physics values, pointers and creates physics loop thread
+PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);                    // Creates a new circle physics body with generic parameters
 PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density);     // Creates a new rectangle physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int vertex, Vector2 pos, float density);         // Creates a new polygon physics body with generic parameters
-PHYSACDEF void DrawPhysicsBodies(void);                 // Draws all created physics bodies shapes
-PHYSACDEF void DrawPhysicsContacts(void);               // Draws all calculated physics contacts points and its normals
-PHYSACDEF void DrawPhysicsInfo(void);                   // Draws debug information about physics states and values
-PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);    // Unitializes and destroy a physics body
-PHYSACDEF void ClosePhysics(void);                      // Unitializes physics pointers and closes physics loop thread
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int vertex, Vector2 pos, float density);                     // Creates a new polygon physics body with generic parameters
+PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 f);        // Adds a force to a physics body
+PHYSACDEF void PhysicsAddTorque(PhysicsBody body, float amount);    // Adds a angular force to a physics body
+PHYSACDEF void DrawPhysicsBodies(void);                             // Draws all created physics bodies shapes
+PHYSACDEF void DrawPhysicsContacts(void);                           // Draws all calculated physics contacts points and its normals
+PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                // Unitializes and destroy a physics body
+PHYSACDEF void ClosePhysics(void);                                  // Unitializes physics pointers and closes physics loop thread
 
 #endif // PHYSAC_H
 
@@ -206,7 +207,7 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     STATIC_DELTATIME            1.0/60.0
+#define     DESIRED_DELTATIME           1.0/60.0
 #define     min(a,b)                    (((a)<(b))?(a):(b))
 #define     max(a,b)                    (((a)>(b))?(a):(b))
 #define     MATH_FLT_MAX                3.402823466e+38f
@@ -229,12 +230,10 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
     static pthread_t physicsThreadId;                       // Physics thread id
 #endif
 static unsigned int usedMemory = 0;                         // Total allocated dynamic memory
-static bool frameStepping = false;                          // Physics frame stepping state
-static bool canStep = false;                                // Physics frame stepping input state
 static bool physicsThreadEnabled = false;                   // Physics thread enabled state
 static double currentTime = 0;                              // Current time in milliseconds
 static double startTime = 0;                                // Start time in milliseconds
-static double deltaTime = STATIC_DELTATIME;                 // Delta time used for physics steps
+static double deltaTime = 0;                                // Delta time used for physics steps
 static double accumulator = 0;                              // Physics time step delta time accumulator
 static unsigned int stepsCount = 0;                         // Total physics steps processed
 static Vector2 gravityForce = { 0 };                        // Physics world gravity force
@@ -256,16 +255,16 @@ static void SolvePhysicsManifold(PhysicsManifold manifold);                     
 static void SolvePhysicsCircleToCircle(PhysicsManifold manifold);                   // Solves collision between two circle shape physics bodies
 static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold);                  // Solves collision between a circle to a polygon shape physics bodies
 static void SolvePhysicsPolygonToCircle(PhysicsManifold manifold);                  // Solves collision between a polygon to a circle shape physics bodies
-static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape A, PhysicsShape B);      // Finds polygon shapes axis least penetration
-static void FindIncidentFace(Vector2 *v0, Vector2 *v1, PhysicsShape ref, PhysicsShape inc, int index);      // Finds two polygon shapes incident face
-static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB);                // Calculates clipping based on a normal and two faces
-static bool BiasGreaterThan(float a, float b);                                      // Check if values are between bias range
 static void SolvePhysicsPolygonToPolygon(PhysicsManifold manifold);                 // Solves collision between two polygons shape physics bodies
 static void IntegratePhysicsForces(PhysicsBody body);                               // Integrates physics forces into velocity
 static void InitializePhysicsManifolds(PhysicsManifold manifold);                   // Initializes physics manifolds to solve collisions
 static void IntegratePhysicsImpulses(PhysicsManifold manifold);                     // Integrates physics collisions impulses to solve collisions
 static void IntegratePhysicsVelocity(PhysicsBody body);                             // Integrates physics velocity into position and forces
 static void CorrectPhysicsPositions(PhysicsManifold manifold);                      // Corrects physics bodies positions based on manifolds collision information
+static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape A, PhysicsShape B);      // Finds polygon shapes axis least penetration
+static void FindIncidentFace(Vector2 *v0, Vector2 *v1, PhysicsShape ref, PhysicsShape inc, int index);      // Finds two polygon shapes incident face
+static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB);                // Calculates clipping based on a normal and two faces
+static bool BiasGreaterThan(float a, float b);                                      // Check if values are between bias range
 static double GetCurrentTime(void);                                                 // Get current time in milliseconds
 static void MathClamp(double *value, double min, double max);                       // Clamp a value in a range
 static Vector2 MathCross(float a, Vector2 v);                                       // Returns the cross product of a vector and a value
@@ -283,7 +282,6 @@ static Vector2 Mat2AxisX(Mat2 matrix);                                          
 static Vector2 Mat2AxisY(Mat2 matrix);                                              // Returns m01 and m11 as a Vector2 struct of a matrix 2x2
 static Mat2 Mat2Transpose(Mat2 m);                                                  // Returns the transpose of a given matrix 2x2
 static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                              // Multiplies a vector by a matrix 2x2
-static Mat2 Mat2Multiply(Mat2 m1, Mat2 m2);                                         // Multiplies two given matrices 2x2
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
@@ -569,6 +567,18 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, Vector2 pos, float den
     return newBody;
 }
 
+// Adds a force to a physics body
+PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 f)
+{
+    body->force = Vector2Add(body->force, f);
+}
+
+// Adds a angular force to a physics body
+PHYSACDEF void PhysicsAddTorque(PhysicsBody body, float amount)
+{
+    body->torque += amount;
+}
+
 // Draws all created physics bodies shapes
 PHYSACDEF void DrawPhysicsBodies(void)
 {
@@ -607,18 +617,19 @@ PHYSACDEF void DrawPhysicsBodies(void)
 
                         DrawLineV(startPosition, endPosition, PHYSAC_SHAPES_COLOR);
 
+                        /*
+                        // Draw vertex normals with lines      
                         startPosition.x = data.vertices[i].x + (data.vertices[ii].x - data.vertices[i].x)/2;
                         startPosition.y = data.vertices[i].y + (data.vertices[ii].y - data.vertices[i].y)/2;
 
                         startPosition = Mat2MultiplyVector2(data.transform, startPosition);
                         startPosition = Vector2Add(startPosition, body->position);
 
-                        // Draw vertex normals with lines             
                         vertexA = Mat2MultiplyVector2(data.transform, data.normals[i]);
                         endPosition.x = startPosition.x + vertexA.x*PHYSAC_CONTACTS_NORMAL;
                         endPosition.y = startPosition.y + vertexA.y*PHYSAC_CONTACTS_NORMAL;
 
-                        DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
+                        DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR); */
                     }
                 } break;
                 default: break;
@@ -647,12 +658,6 @@ PHYSACDEF void DrawPhysicsContacts(void)
             }
         }
     }
-}
-
-// Draws debug information about physics states and values
-PHYSACDEF void DrawPhysicsInfo(void)
-{
-    DrawText(FormatText("Steps: %i. Accumulator: %f", stepsCount, accumulator), 10, 10, 10, PHYSAC_INFO_COLOR);
 }
 
 // Unitializes and destroys a physics body
@@ -792,33 +797,25 @@ static void *PhysicsLoop(void *arg)
     {
         // Calculate current time
         currentTime = GetCurrentTime();
+        
+        // Calculate current delta time
+        deltaTime = currentTime - startTime;
 
         // Store the time elapsed since the last frame began
-        accumulator += currentTime - startTime;
+        accumulator += deltaTime;
 
         // Clamp accumulator to max time step to avoid bad performance
         MathClamp(&accumulator, 0, MAX_TIMESTEP);
 
-        // Record the starting of this frame
-        startTime = currentTime;
-
         // Fixed time stepping loop
-        while (accumulator >= deltaTime)
+        while (accumulator >= DESIRED_DELTATIME)
         {
-            if (!frameStepping) PhysicsStep();
-            else
-            {
-                if (canStep)
-                {
-                    PhysicsStep();
-                    canStep = false;
-                }
-            }
-
+            PhysicsStep();
             accumulator -= deltaTime;
         }
-
-        const double alpha = accumulator/deltaTime;
+        
+        // Record the starting of this frame
+        startTime = currentTime;
     }
 
     return NULL;
@@ -1156,147 +1153,6 @@ static void SolvePhysicsPolygonToCircle(PhysicsManifold manifold)
     manifold->normal.y *= -1;
 }
 
-// Returns the extreme point along a direction within a polygon
-static Vector2 GetSupport(PhysicsShape shape, Vector2 dir)
-{
-    float bestProjection = -MATH_FLT_MAX;
-    Vector2 bestVertex = { 0 };
-    PolygonData data = shape.vertexData;
-
-    for (int i = 0; i < data.vertexCount; i++)
-    {
-        Vector2 v = data.vertices[i];
-        float projection = MathDot(v, dir);
-        
-        if (projection > bestProjection)
-        {
-            bestVertex = v;
-            bestProjection = projection;
-        }
-    }
-
-    return bestVertex;
-}
-
-// Finds polygon shapes axis least penetration
-static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape A, PhysicsShape B)
-{
-    float bestDistance = -MATH_FLT_MAX;
-    int bestIndex = 0;
-
-    PolygonData dataA = A.vertexData;
-    PolygonData dataB = B.vertexData;
-
-    for (int i = 0; i < dataA.vertexCount; i++)
-    {
-        // Retrieve a face normal from A shape
-        Vector2 n = dataA.normals[i];
-        Vector2 nw = Mat2MultiplyVector2(dataA.transform, n);
-
-        // Transform face normal into B shape's model space
-        Mat2 buT = Mat2Transpose(dataB.transform);
-        n = Mat2MultiplyVector2(buT, nw);
-
-        // Retrieve support point from B shape along -n
-        Vector2 s = GetSupport(B, (Vector2){ -n.x, -n.y });
-
-        // Retrieve vertex on face from A shape, transform into B shape's model space
-        Vector2 v = dataA.vertices[i];
-        v = Mat2MultiplyVector2(dataA.transform, v);
-        v = Vector2Add(v, A.body->position);
-        v = Vector2Subtract(v, B.body->position);
-        v = Mat2MultiplyVector2(buT, v);
-
-        // Compute penetration distance in B shape's model space
-        float d = MathDot(n, Vector2Subtract(s, v));
-
-        // Store greatest distance
-        if (d > bestDistance)
-        {
-            bestDistance = d;
-            bestIndex = i;
-        }
-    }
-
-    *faceIndex = bestIndex;
-    return bestDistance;
-}
-
-// Finds two polygon shapes incident face
-static void FindIncidentFace(Vector2 *v0, Vector2 *v1, PhysicsShape ref, PhysicsShape inc, int index)
-{
-    PolygonData refData = ref.vertexData;
-    PolygonData incData = inc.vertexData;
-
-    Vector2 referenceNormal = refData.normals[index];
-
-    // Calculate normal in incident's frame of reference
-    referenceNormal = Mat2MultiplyVector2(refData.transform, referenceNormal); // To world space
-    referenceNormal = Mat2MultiplyVector2(Mat2Transpose(incData.transform), referenceNormal); // To incident's model space
-
-    // Find most anti-normal face on polygon
-    int incidentFace = 0;
-    float minDot = MATH_FLT_MAX;
-
-    for (int i = 0; i < incData.vertexCount; i++)
-    {
-        float dot = MathDot(referenceNormal, incData.normals[i]);
-        
-        if (dot < minDot)
-        {
-            minDot = dot;
-            incidentFace = i;
-        }
-    }
-
-    // Assign face vertices for incident face
-    *v0 = Mat2MultiplyVector2(incData.transform, incData.vertices[incidentFace]);
-    *v0 = Vector2Add(*v0, inc.body->position);
-    incidentFace = (((incidentFace + 1) < incData.vertexCount) ? (incidentFace + 1) : 0);
-    *v1 = Mat2MultiplyVector2(incData.transform, incData.vertices[incidentFace]);
-    *v1 = Vector2Add(*v1, inc.body->position);
-}
-
-// Calculates clipping based on a normal and two faces
-static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB)
-{
-    int sp = 0;
-    Vector2 out[2] = { *faceA, *faceB };
-
-    // Retrieve distances from each endpoint to the line
-    float d1 = MathDot(n, *faceA) - c;
-    float d2 = MathDot(n, *faceB) - c;
-
-    // If negative (behind plane)
-    if (d1 <= 0) out[sp++] = *faceA;
-    if (d2 <= 0) out[sp++] = *faceB;
-
-    // If the points are on different sides of the plane
-    if ((d1*d2) < 0)
-    {
-        // Push intersection point
-        float alpha = d1/(d1 - d2);
-        out[sp] = *faceA;
-        Vector2 delta = Vector2Subtract(*faceB, *faceA);
-        delta.x *= alpha;
-        delta.y *= alpha;
-        out[sp] = Vector2Add(out[sp], delta);
-        sp++;
-    }
-
-    // Assign the new converted values
-    *faceA = out[0];
-    *faceB = out[1];
-
-    return sp;
-}
-
-// Check if values are between bias range
-static bool BiasGreaterThan(float a, float b)
-{
-    return (a >= (b*0.95f + a*0.01f));
-}
-
 // Solves collision between two polygons shape physics bodies
 static void SolvePhysicsPolygonToPolygon(PhysicsManifold manifold)
 {
@@ -1543,9 +1399,7 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 
 // Integrates physics velocity into position and forces
 static void IntegratePhysicsVelocity(PhysicsBody body)
-{
-    // if (body->inverseMass == 0 || !body->enabled) return;
-
+{    
     body->position.x += body->velocity.x*deltaTime;
     body->position.y += body->velocity.y*deltaTime;
 
@@ -1573,6 +1427,147 @@ static void CorrectPhysicsPositions(PhysicsManifold manifold)
         manifold->bodyB->position.x += correction.x*manifold->bodyB->inverseMass;
         manifold->bodyB->position.y += correction.y*manifold->bodyB->inverseMass;
     }
+}
+
+// Returns the extreme point along a direction within a polygon
+static Vector2 GetSupport(PhysicsShape shape, Vector2 dir)
+{
+    float bestProjection = -MATH_FLT_MAX;
+    Vector2 bestVertex = { 0 };
+    PolygonData data = shape.vertexData;
+
+    for (int i = 0; i < data.vertexCount; i++)
+    {
+        Vector2 v = data.vertices[i];
+        float projection = MathDot(v, dir);
+        
+        if (projection > bestProjection)
+        {
+            bestVertex = v;
+            bestProjection = projection;
+        }
+    }
+
+    return bestVertex;
+}
+
+// Finds polygon shapes axis least penetration
+static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape A, PhysicsShape B)
+{
+    float bestDistance = -MATH_FLT_MAX;
+    int bestIndex = 0;
+
+    PolygonData dataA = A.vertexData;
+    PolygonData dataB = B.vertexData;
+
+    for (int i = 0; i < dataA.vertexCount; i++)
+    {
+        // Retrieve a face normal from A shape
+        Vector2 n = dataA.normals[i];
+        Vector2 nw = Mat2MultiplyVector2(dataA.transform, n);
+
+        // Transform face normal into B shape's model space
+        Mat2 buT = Mat2Transpose(dataB.transform);
+        n = Mat2MultiplyVector2(buT, nw);
+
+        // Retrieve support point from B shape along -n
+        Vector2 s = GetSupport(B, (Vector2){ -n.x, -n.y });
+
+        // Retrieve vertex on face from A shape, transform into B shape's model space
+        Vector2 v = dataA.vertices[i];
+        v = Mat2MultiplyVector2(dataA.transform, v);
+        v = Vector2Add(v, A.body->position);
+        v = Vector2Subtract(v, B.body->position);
+        v = Mat2MultiplyVector2(buT, v);
+
+        // Compute penetration distance in B shape's model space
+        float d = MathDot(n, Vector2Subtract(s, v));
+
+        // Store greatest distance
+        if (d > bestDistance)
+        {
+            bestDistance = d;
+            bestIndex = i;
+        }
+    }
+
+    *faceIndex = bestIndex;
+    return bestDistance;
+}
+
+// Finds two polygon shapes incident face
+static void FindIncidentFace(Vector2 *v0, Vector2 *v1, PhysicsShape ref, PhysicsShape inc, int index)
+{
+    PolygonData refData = ref.vertexData;
+    PolygonData incData = inc.vertexData;
+
+    Vector2 referenceNormal = refData.normals[index];
+
+    // Calculate normal in incident's frame of reference
+    referenceNormal = Mat2MultiplyVector2(refData.transform, referenceNormal); // To world space
+    referenceNormal = Mat2MultiplyVector2(Mat2Transpose(incData.transform), referenceNormal); // To incident's model space
+
+    // Find most anti-normal face on polygon
+    int incidentFace = 0;
+    float minDot = MATH_FLT_MAX;
+
+    for (int i = 0; i < incData.vertexCount; i++)
+    {
+        float dot = MathDot(referenceNormal, incData.normals[i]);
+        
+        if (dot < minDot)
+        {
+            minDot = dot;
+            incidentFace = i;
+        }
+    }
+
+    // Assign face vertices for incident face
+    *v0 = Mat2MultiplyVector2(incData.transform, incData.vertices[incidentFace]);
+    *v0 = Vector2Add(*v0, inc.body->position);
+    incidentFace = (((incidentFace + 1) < incData.vertexCount) ? (incidentFace + 1) : 0);
+    *v1 = Mat2MultiplyVector2(incData.transform, incData.vertices[incidentFace]);
+    *v1 = Vector2Add(*v1, inc.body->position);
+}
+
+// Calculates clipping based on a normal and two faces
+static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB)
+{
+    int sp = 0;
+    Vector2 out[2] = { *faceA, *faceB };
+
+    // Retrieve distances from each endpoint to the line
+    float d1 = MathDot(n, *faceA) - c;
+    float d2 = MathDot(n, *faceB) - c;
+
+    // If negative (behind plane)
+    if (d1 <= 0) out[sp++] = *faceA;
+    if (d2 <= 0) out[sp++] = *faceB;
+
+    // If the points are on different sides of the plane
+    if ((d1*d2) < 0)
+    {
+        // Push intersection point
+        float alpha = d1/(d1 - d2);
+        out[sp] = *faceA;
+        Vector2 delta = Vector2Subtract(*faceB, *faceA);
+        delta.x *= alpha;
+        delta.y *= alpha;
+        out[sp] = Vector2Add(out[sp], delta);
+        sp++;
+    }
+
+    // Assign the new converted values
+    *faceA = out[0];
+    *faceB = out[1];
+
+    return sp;
+}
+
+// Check if values are between bias range
+static bool BiasGreaterThan(float a, float b)
+{
+    return (a >= (b*0.95f + a*0.01f));
 }
 
 // Get current time in milliseconds
@@ -1652,30 +1647,16 @@ static inline Vector2 Vector2Subtract(Vector2 a, Vector2 b)
 // Creates a matrix 2x2 from a given radians value
 static inline Mat2 Mat2Radians(float radians)
 {
-    Mat2 matrix = { 0 };
-
     float c = cos(radians);
     float s = sin(radians);
-    
-    matrix.m00 = c;
-    matrix.m01 = -s;
-    matrix.m10 = s;
-    matrix.m11 = c;
 
-    return matrix;
+    return (Mat2){ c, -s, s, c };
 }
 
 // Creates a matrix 2x2 from specific values
 static inline Mat2 CreateMat2(float a, float b, float c, float d)
 {
-    Mat2 matrix = { 0 };
-
-    matrix.m00 = a;
-    matrix.m01 = b;
-    matrix.m10 = c;
-    matrix.m11 = d;
-
-    return matrix;
+    return (Mat2){ a, b, c, d };
 }
 
 // Set values from radians to a created matrix 2x2
@@ -1714,38 +1695,13 @@ static inline Vector2 Mat2AxisY(Mat2 matrix)
 // Returns the transpose of a given matrix 2x2
 static inline Mat2 Mat2Transpose(Mat2 m)
 {
-    Mat2 matrix = { 0 };
-
-    matrix.m00 = m.m00;
-    matrix.m01 = m.m10;
-    matrix.m10 = m.m01;
-    matrix.m11 = m.m11;
-
-    return matrix;
+    return (Mat2){ m.m00, m.m10, m.m01, m.m11 };
 }
 
 // Multiplies a vector by a matrix 2x2
 static inline Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v)
 {
-    Vector2 vector = { 0 };
-
-    vector.x = m.m00*v.x + m.m01*v.y;
-    vector.y = m.m10*v.x + m.m11*v.y;
-
-    return vector;
-}
-
-// Multiplies two given matrices 2x2
-static inline Mat2 Mat2Multiply(Mat2 m1, Mat2 m2)
-{
-    Mat2 matrix = { 0 };
-
-    matrix.m00 = m1.m00*m2.m00 + m1.m01*m2.m10;
-    matrix.m00 = m1.m00*m2.m01 + m1.m01*m2.m11;
-    matrix.m00 = m1.m10*m2.m00 + m1.m11*m2.m10;
-    matrix.m00 = m1.m10*m2.m01 + m1.m11*m2.m11;
-
-    return matrix;
+    return (Vector2){ m.m00*v.x + m.m01*v.y, m.m10*v.x + m.m11*v.y };
 }
 
 #endif  // PHYSAC_IMPLEMENTATION

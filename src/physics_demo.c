@@ -10,12 +10,7 @@
 ********************************************************************************************/
 
 #define PHYSAC_IMPLEMENTATION
-#include "physac.h"
-#include "stdio.h"
-
-#define     GRAVITY     (Vector2){ 0, 9.81f/100 }
-#define     FORCE       10000
-#define     TORQUE      10000
+#include "physac.h" 
 
 int main()
 {
@@ -28,7 +23,8 @@ int main()
     InitWindow(screenWidth, screenHeight, "Physac [raylib] - demo");
     SetTargetFPS(60);
 
-    InitPhysics(GRAVITY);
+    // Initialize physics and default physics bodies
+    InitPhysics((Vector2){ 0, 9.81f/1000 });
 
     PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
     A->enabled = false;
@@ -42,21 +38,26 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------        
-        if (IsMouseButtonPressed(0)) CreatePhysicsBodyPolygon(5, GetMousePosition(), 10);
-        else if (IsMouseButtonPressed(1)) CreatePhysicsBodyCircle(GetMousePosition(), 2, GetRandomValue(20, 60));
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetRandomValue(3, PHYSAC_MAX_VERTICES), GetMousePosition(), 10);
+        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), 2, GetRandomValue(20, 60));
 
-        if (IsKeyPressed('F')) frameStepping = !frameStepping;
-        if (IsKeyDown(' ')) canStep = true;
-        if (IsKeyPressed('R'))
+        if (IsKeyPressed('R'))  // Reset physics input
         {
             ClosePhysics();
-            InitPhysics(GRAVITY);
+            InitPhysics((Vector2){ 0, 9.81f/1000 });
 
             A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
             A->enabled = false;
 
             C = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight - 50 }, (Vector2){ -500, -50 }, (Vector2){ 500, 50 }, 10);
             C->enabled = false;
+        }
+
+        // Destroy falling physics bodies
+        for (int i = physicsBodiesCount - 1; i >= 0; i--)
+        {
+            PhysicsBody body = bodies[i];
+            if (body->position.y > screenHeight*2) DestroyPhysicsBody(body);
         }
         //----------------------------------------------------------------------------------
 
@@ -67,8 +68,9 @@ int main()
             ClearBackground(BLACK);
 
             DrawPhysicsBodies();
-            DrawPhysicsContacts();
-            DrawPhysicsInfo();
+
+            DrawText("Left mouse button to create a polygon", 10, 10, 10, WHITE);
+            DrawText("Right mouse button to create a circle", 10, 30, 10, WHITE);
 
         EndDrawing();
         //----------------------------------------------------------------------------------
