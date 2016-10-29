@@ -84,8 +84,8 @@
 #define     DESIRED_DELTATIME               1.0/60.0
 #define     MAX_TIMESTEP                    0.02
 #define     COLLISION_ITERATIONS            100
-#define     PENETRATION_ALLOWANCE           0.02f
-#define     PENETRATION_CORRECTION          0.8f
+#define     PENETRATION_ALLOWANCE           0.05f
+#define     PENETRATION_CORRECTION          0.4f
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
 #define     PHYSAC_SHAPES_COLOR             GREEN
@@ -201,7 +201,7 @@ PHYSACDEF void ClosePhysics(void);                                  // Unitializ
 
 #include <math.h>                           // Required for: sqrt()
 #include <stdlib.h>                         // Required for: malloc(), free()
-#include "C:\raylib\raylib\src\utils.h"     // Required for: TraceLog()
+#include <stdio.h>                          // Required for: printf()
 
 // Functions required to query time on Windows
 int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
@@ -288,7 +288,7 @@ static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                          
 // Initializes physics values, pointers and creates physics loop thread
 PHYSACDEF void InitPhysics(Vector2 gravity)
 {
-    TraceLog(WARNING, "[PHYSAC] physics module initialized successfully");
+    printf("[PHYSAC] physics module initialized successfully\n");
 
     // Initialize world gravity
     gravityForce = gravity;
@@ -356,9 +356,9 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
 
-        TraceLog(WARNING, "[PHYSAC] created circle physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+        printf("[PHYSAC] created circle physics body id %i\n", newBody->id);
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
+    else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
 
     return newBody;
 }
@@ -458,9 +458,9 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vecto
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
         
-        TraceLog(WARNING, "[PHYSAC] created polygon physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+        printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
+    else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
     
     return newBody;
 }
@@ -560,9 +560,9 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, Vector2 pos, float den
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
         
-        TraceLog(WARNING, "[PHYSAC] created polygon physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+        printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
+    else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
     
     return newBody;
 }
@@ -663,7 +663,7 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
             }
         }
 
-        if (index == -1) TraceLog(ERROR, "[PHYSAC] cannot find body id %i in pointers array", id);
+        if (index == -1) printf("[PHYSAC] cannot find body id %i in pointers array\n", id);
         
         // Free body allocated memory
         PHYSAC_FREE(bodies[index]);
@@ -679,9 +679,9 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
         // Update physics bodies count
         physicsBodiesCount--;
 
-        TraceLog(WARNING, "[PHYSAC] destroyed physics body id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
+        printf("[PHYSAC] destroyed physics body id %i\n", id);
     }
-    else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced body");
+    else printf("[PHYSAC] error trying to destroy a null referenced body\n");
 }
 
 // Unitializes physics pointers and exits physics loop thread
@@ -689,21 +689,6 @@ PHYSACDEF void ClosePhysics(void)
 {
     // Exit physics loop thread
     physicsThreadEnabled = false;
-
-    // Unitialize physics bodies dynamic memory allocations
-    int currentCount = physicsBodiesCount;
-    for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
-
-    // Unitialize physics manifolds dynamic memory allocations
-    for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
-
-    #ifndef PHYSAC_NO_THREADS
-        pthread_join(physicsThreadId, NULL);
-    #endif
-
-    if (physicsBodiesCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated bodies [USED RAM: %i bytes]", physicsBodiesCount, usedMemory);
-    else if (physicsManifoldsCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated manifolds [USED RAM: %i bytes]", physicsManifoldsCount, usedMemory);
-    else TraceLog(WARNING, "[PHYSAC] physics module closed successfully");
 }
 
 //----------------------------------------------------------------------------------
@@ -769,7 +754,7 @@ static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max)
 // Physics loop thread function
 static void *PhysicsLoop(void *arg)
 {
-    TraceLog(WARNING, "[PHYSAC] physics thread created with successfully");
+    printf("[PHYSAC] physics thread created with successfully\n");
 
     // Initialize physics loop thread values
     physicsThreadEnabled = true;
@@ -803,6 +788,21 @@ static void *PhysicsLoop(void *arg)
         // Record the starting of this frame
         startTime = currentTime;
     }
+    
+    // Unitialize physics bodies dynamic memory allocations
+    int currentCount = physicsBodiesCount;
+    for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
+
+    // Unitialize physics manifolds dynamic memory allocations
+    for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
+
+    #ifndef PHYSAC_NO_THREADS
+        pthread_join(physicsThreadId, NULL);
+    #endif
+
+    if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
+    else if (physicsManifoldsCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated manifolds [MEMORY: %i bytes]\n", physicsManifoldsCount, usedMemory);
+    else printf("[PHYSAC] physics module closed successfully\n");
 
     return NULL;
 }
@@ -920,9 +920,9 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         physicsManifoldsCount++;
 
         // Avoided trace log due to bad performance for tracing messages each physics step
-        // TraceLog(WARNING, "[PHYSAC] created physics manifold id %i with physics bodies id %i and %i [USED RAM: %i bytes]", newManifold->id, newManifold->bodyA->id, newManifold->bodyB->id, usedMemory);
+        // printf("[PHYSAC] created physics manifold id %i with physics bodies id %i and %i\n", newManifold->id, newManifold->bodyA->id, newManifold->bodyB->id);
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics manifold creation failed because there is any available id to use");
+    else printf("[PHYSAC] new physics manifold creation failed because there is any available id to use\n");
 
     return newManifold;
 }
@@ -944,7 +944,7 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
             }
         }
 
-        if (index == -1) TraceLog(ERROR, "[PHYSAC] cannot find manifold id %i in pointers array", id);
+        if (index == -1) printf("[PHYSAC] cannot find manifold id %i in pointers array\n", id);
 
         // Free manifold allocated memory
         PHYSAC_FREE(contacts[index]);
@@ -961,9 +961,9 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
         physicsManifoldsCount--;
 
         // Avoided trace log due to bad performance for tracing messages each physics step
-        // TraceLog(WARNING, "[PHYSAC] destroyed physics manifold id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
+        // printf("[PHYSAC] destroyed physics manifold id %i\n", id);
     }
-    else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced manifold");
+    else printf("[PHYSAC] error trying to destroy a null referenced manifold\n");
 }
 
 // Solves a created physics manifold between two physics bodies
