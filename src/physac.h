@@ -27,6 +27,10 @@
 *       internally in the library and input management and drawing functions must be provided by
 *       the user (check library implementation for further details).
 *
+*   #define PHYSAC_DEBUG
+*       Traces log messages when creating and destroying physics bodies and detects errors in physics 
+*       calculations and reference exceptions; it is useful for debug purposes
+*
 *   #define PHYSAC_MALLOC()
 *   #define PHYSAC_FREE()
 *       You can define your own malloc/free implementation replacing stdlib.h malloc()/free() functions.
@@ -59,7 +63,8 @@
 #ifndef PHYSAC_H
 #define PHYSAC_H
 
-// #define PHYSAC_STANDALONE
+// #define  PHYSAC_STANDALONE   // Note: it does not work yet
+// #define  PHYSAC_DEBUG
 #ifndef PHYSAC_STANDALONE
     #include "raylib.h"
 #endif
@@ -81,11 +86,13 @@
 #define     MAX_PHYSICS_BODIES              2048
 #define     MAX_PHYSICS_MANIFOLDS           2048
 #define     PHYSAC_MAX_VERTICES             8
+
 #define     DESIRED_DELTATIME               1.0/60.0
 #define     MAX_TIMESTEP                    0.02
 #define     COLLISION_ITERATIONS            100
 #define     PENETRATION_ALLOWANCE           0.05f
 #define     PENETRATION_CORRECTION          0.4f
+
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
 #define     PHYSAC_SHAPES_COLOR             GREEN
@@ -98,14 +105,14 @@
 // Types and Structures Definition
 // NOTE: Below types are required for PHYSAC_STANDALONE usage
 //----------------------------------------------------------------------------------
-#if defined(PHYSAC_STANDALONE)
+#ifdef PHYSAC_STANDALONE
     typedef struct Vector2 {
         float x;
         float y;
     } Vector2;
 
     // Boolean type
-    #if !defined(_STDBOOL_H)
+    #ifndef _STDBOOL_H
         typedef enum { false, true } bool;
         #define _STDBOOL_H
     #endif
@@ -193,15 +200,18 @@ PHYSACDEF void ClosePhysics(void);                                  // Unitializ
 *
 ************************************************************************************/
 
-#if defined(PHYSAC_IMPLEMENTATION)
+#ifdef PHYSAC_IMPLEMENTATION
 
 #ifndef PHYSAC_NO_THREADS
     #include <pthread.h>                    // Required for: pthread_t, pthread_create()
 #endif
 
-#include <math.h>                           // Required for: sqrt()
+#ifdef PHYSAC_DEBUG
+    #include <stdio.h>                      // Required for: printf()
+#endif
+
 #include <stdlib.h>                         // Required for: malloc(), free()
-#include <stdio.h>                          // Required for: printf()
+#include <math.h>                           // Required for: cos(), sin(), fabs(), sqrt()
 
 // Functions required to query time on Windows
 int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
@@ -288,7 +298,9 @@ static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                          
 // Initializes physics values, pointers and creates physics loop thread
 PHYSACDEF void InitPhysics(Vector2 gravity)
 {
-    printf("[PHYSAC] physics module initialized successfully\n");
+    #ifdef PHYSAC_DEBUG
+        printf("[PHYSAC] physics module initialized successfully\n");
+    #endif
 
     // Initialize world gravity
     gravityForce = gravity;
@@ -356,9 +368,13 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
 
-        printf("[PHYSAC] created circle physics body id %i\n", newBody->id);
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] created circle physics body id %i\n", newBody->id);
+        #endif
     }
-    else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
+    #endif
 
     return newBody;
 }
@@ -457,11 +473,15 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vecto
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
-        
-        printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
+
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
+        #endif
     }
-    else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
-    
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
+    #endif
+
     return newBody;
 }
 
@@ -559,11 +579,15 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, Vector2 pos, float den
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
-        
-        printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
+
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
+        #endif
     }
-    else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
-    
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
+    #endif
+
     return newBody;
 }
 
@@ -663,8 +687,10 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
             }
         }
 
-        if (index == -1) printf("[PHYSAC] cannot find body id %i in pointers array\n", id);
-        
+        #ifdef PHYSAC_DEBUG
+            if (index == -1) printf("[PHYSAC] cannot find body id %i in pointers array\n", id);
+        #endif
+
         // Free body allocated memory
         PHYSAC_FREE(bodies[index]);
         usedMemory -= sizeof(PhysicsBodyData);
@@ -679,9 +705,13 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
         // Update physics bodies count
         physicsBodiesCount--;
 
-        printf("[PHYSAC] destroyed physics body id %i\n", id);
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] destroyed physics body id %i\n", id);
+        #endif
     }
-    else printf("[PHYSAC] error trying to destroy a null referenced body\n");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] error trying to destroy a null referenced body\n");
+    #endif
 }
 
 // Unitializes physics pointers and exits physics loop thread
@@ -754,7 +784,9 @@ static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max)
 // Physics loop thread function
 static void *PhysicsLoop(void *arg)
 {
-    printf("[PHYSAC] physics thread created with successfully\n");
+    #ifdef PHYSAC_DEBUG
+        printf("[PHYSAC] physics thread created with successfully\n");
+    #endif
 
     // Initialize physics loop thread values
     physicsThreadEnabled = true;
@@ -788,7 +820,7 @@ static void *PhysicsLoop(void *arg)
         // Record the starting of this frame
         startTime = currentTime;
     }
-    
+
     // Unitialize physics bodies dynamic memory allocations
     int currentCount = physicsBodiesCount;
     for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
@@ -800,9 +832,11 @@ static void *PhysicsLoop(void *arg)
         pthread_join(physicsThreadId, NULL);
     #endif
 
-    if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
-    else if (physicsManifoldsCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated manifolds [MEMORY: %i bytes]\n", physicsManifoldsCount, usedMemory);
-    else printf("[PHYSAC] physics module closed successfully\n");
+    #ifdef PHYSAC_DEBUG
+        if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
+        else if (physicsManifoldsCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated manifolds [MEMORY: %i bytes]\n", physicsManifoldsCount, usedMemory);
+        else printf("[PHYSAC] physics module closed successfully\n");
+    #endif
 
     return NULL;
 }
@@ -918,11 +952,10 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         // Add new body to bodies pointers array and update bodies count
         contacts[physicsManifoldsCount] = newManifold;
         physicsManifoldsCount++;
-
-        // Avoided trace log due to bad performance for tracing messages each physics step
-        // printf("[PHYSAC] created physics manifold id %i with physics bodies id %i and %i\n", newManifold->id, newManifold->bodyA->id, newManifold->bodyB->id);
     }
-    else printf("[PHYSAC] new physics manifold creation failed because there is any available id to use\n");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics manifold creation failed because there is any available id to use\n");
+    #endif
 
     return newManifold;
 }
@@ -944,7 +977,9 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
             }
         }
 
-        if (index == -1) printf("[PHYSAC] cannot find manifold id %i in pointers array\n", id);
+        #ifdef PHYSAC_DEBUG
+            if (index == -1) printf("[PHYSAC] cannot find manifold id %i in pointers array\n", id);
+        #endif
 
         // Free manifold allocated memory
         PHYSAC_FREE(contacts[index]);
@@ -959,11 +994,10 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
 
         // Update physics manifolds count
         physicsManifoldsCount--;
-
-        // Avoided trace log due to bad performance for tracing messages each physics step
-        // printf("[PHYSAC] destroyed physics manifold id %i\n", id);
     }
-    else printf("[PHYSAC] error trying to destroy a null referenced manifold\n");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] error trying to destroy a null referenced manifold\n");
+    #endif
 }
 
 // Solves a created physics manifold between two physics bodies
