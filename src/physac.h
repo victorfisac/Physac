@@ -78,11 +78,14 @@
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     COLLISION_ITERATIONS            7
-#define     MAX_TIMESTEP                    0.02
 #define     MAX_PHYSICS_BODIES              2048
 #define     MAX_PHYSICS_MANIFOLDS           2048
 #define     PHYSAC_MAX_VERTICES             8
+#define     DESIRED_DELTATIME               1.0/60.0
+#define     MAX_TIMESTEP                    0.02
+#define     COLLISION_ITERATIONS            100
+#define     PENETRATION_ALLOWANCE           0.02f
+#define     PENETRATION_CORRECTION          0.8f
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
 #define     PHYSAC_SHAPES_COLOR             GREEN
@@ -207,7 +210,6 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     DESIRED_DELTATIME           1.0/60.0
 #define     min(a,b)                    (((a)<(b))?(a):(b))
 #define     max(a,b)                    (((a)>(b))?(a):(b))
 #define     MATH_FLT_MAX                3.402823466e+38f
@@ -215,8 +217,6 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 #define     MATH_EPSILON                0.000001f
 #define     MATH_DEG2RAD                (MATH_PI/180.0f)
 #define     MATH_RAD2DEG                (180.0f/MATH_PI)
-#define     PENETRATION_ALLOWANCE       0.05f
-#define     PENETRATION_CORRECTION      0.4f
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -1077,8 +1077,8 @@ static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold)
     }
 
     // Determine which voronoi region of the edge center of circle lies within
-    float dot1 = MathDot((Vector2){ center.x - v1.x, center.y - v1.y }, (Vector2){ v2.x - v1.x, v2.y - v1.y });
-    float dot2 = MathDot((Vector2){ center.x - v2.x, center.y - v2.y }, (Vector2){ v1.x - v2.x, v1.y - v2.y });
+    float dot1 = MathDot(Vector2Subtract(center, v1), Vector2Subtract(v2, v1));
+    float dot2 = MathDot(Vector2Subtract(center, v2), Vector2Subtract(v1, v2));
     manifold->penetration = A->shape.radius - separation;
 
     if (dot1 <= 0) // Closest to v1
@@ -1293,7 +1293,7 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
     PhysicsBody B = manifold->bodyB;
 
     // Early out and positional correct if both objects have infinite mass
-    if (fabs(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass) <= MATH_EPSILON)
+    if (fabs(A->inverseMass + B->inverseMass) <= MATH_EPSILON)
     {
         A->velocity = (Vector2){ 0 };        
         B->velocity = (Vector2){ 0 };
@@ -1398,20 +1398,23 @@ static void IntegratePhysicsVelocity(PhysicsBody body)
 // Corrects physics bodies positions based on manifolds collision information
 static void CorrectPhysicsPositions(PhysicsManifold manifold)
 {
-    Vector2 correction;
-    correction.x = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass))*manifold->normal.x*PENETRATION_CORRECTION;
-    correction.y = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass))*manifold->normal.y*PENETRATION_CORRECTION;
+    PhysicsBody A = manifold->bodyA;
+    PhysicsBody B = manifold->bodyB;
 
-    if (manifold->bodyA->enabled)
+    Vector2 correction = { 0 };
+    correction.x = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(A->inverseMass + B->inverseMass))*manifold->normal.x*PENETRATION_CORRECTION;
+    correction.y = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(A->inverseMass + B->inverseMass))*manifold->normal.y*PENETRATION_CORRECTION;
+
+    if (A->enabled)
     {
-        manifold->bodyA->position.x -= correction.x*manifold->bodyA->inverseMass;
-        manifold->bodyA->position.y -= correction.y*manifold->bodyA->inverseMass;
+        A->position.x -= correction.x*A->inverseMass;
+        A->position.y -= correction.y*A->inverseMass;
     }
 
-    if (manifold->bodyB->enabled)
+    if (B->enabled)
     {
-        manifold->bodyB->position.x += correction.x*manifold->bodyB->inverseMass;
-        manifold->bodyB->position.y += correction.y*manifold->bodyB->inverseMass;
+        B->position.x += correction.x*B->inverseMass;
+        B->position.y += correction.y*B->inverseMass;
     }
 }
 
