@@ -29,7 +29,7 @@ int main()
     PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
     A->enabled = false;
 
-    PhysicsBody C = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight - 50 }, (Vector2){ -500, -50 }, (Vector2){ 500, 50 }, 10);
+    PhysicsBody C = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, (Vector2){ -500, -50 }, (Vector2){ 500, 75 }, 10);
     C->enabled = false;
     //--------------------------------------------------------------------------------------
 
@@ -39,7 +39,7 @@ int main()
         // Update
         //----------------------------------------------------------------------------------        
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetRandomValue(3, PHYSAC_MAX_VERTICES), GetMousePosition(), 10);
-        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), 2, GetRandomValue(20, 60));
+        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), 2, GetRandomValue(10, 45));
 
         if (IsKeyPressed('R'))  // Reset physics input
         {
