@@ -65,9 +65,6 @@
 
 // #define  PHYSAC_STANDALONE   // Note: it does not work yet
 // #define  PHYSAC_DEBUG
-#ifndef PHYSAC_STANDALONE
-    #include "raylib.h"
-#endif
 
 #define PHYSAC_STATIC
 #ifdef PHYSAC_STATIC
