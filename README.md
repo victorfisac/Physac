@@ -57,13 +57,16 @@ PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);
 PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density);
 
 // Creates a new polygon physics body with generic parameters
-PhysicsBody CreatePhysicsBodyPolygon(int vertex, Vector2 pos, float density);
+PhysicsBody CreatePhysicsBodyPolygon(int vertex, float distance, Vector2 pos, float density);
 
 // Adds a force to a physics body
 void PhysicsAddForce(PhysicsBody body, Vector2 f);
 
 // Adds a angular force to a physics body
 void PhysicsAddTorque(PhysicsBody body, float amount);
+
+// Shatters a polygon shape physics body to little physics bodies with explosion force
+void PhysicsShatter(PhysicsBody body, Vector2 position, float force);
 
 // Draws all created physics bodies shapes
 void DrawPhysicsBodies(void);
