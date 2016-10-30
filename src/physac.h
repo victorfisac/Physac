@@ -184,13 +184,14 @@ typedef struct PhysicsManifoldData {
 PHYSACDEF void InitPhysics(Vector2 gravity);                                                                // Initializes physics values, pointers and creates physics loop thread
 PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);                    // Creates a new circle physics body with generic parameters
 PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density);     // Creates a new rectangle physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int vertex, Vector2 pos, float density);                     // Creates a new polygon physics body with generic parameters
-PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 f);        // Adds a force to a physics body
-PHYSACDEF void PhysicsAddTorque(PhysicsBody body, float amount);    // Adds a angular force to a physics body
-PHYSACDEF void DrawPhysicsBodies(void);                             // Draws all created physics bodies shapes
-PHYSACDEF void DrawPhysicsContacts(void);                           // Draws all calculated physics contacts points and its normals
-PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                // Unitializes and destroy a physics body
-PHYSACDEF void ClosePhysics(void);                                  // Unitializes physics pointers and closes physics loop thread
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int vertex, float distance, Vector2 pos, float density);     // Creates a new polygon physics body with generic parameters
+PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 f);                            // Adds a force to a physics body
+PHYSACDEF void PhysicsAddTorque(PhysicsBody body, float amount);                        // Adds a angular force to a physics body
+PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force);         // Shatters a polygon shape physics body to little physics bodies with explosion force
+PHYSACDEF void DrawPhysicsBodies(void);                                                 // Draws all created physics bodies shapes
+PHYSACDEF void DrawPhysicsContacts(void);                                               // Draws all calculated physics contacts points and its normals
+PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                                    // Unitializes and destroy a physics body
+PHYSACDEF void ClosePhysics(void);                                                      // Unitializes physics pointers and closes physics loop thread
 
 #endif // PHYSAC_H
 
@@ -255,7 +256,7 @@ static unsigned int physicsManifoldsCount = 0;              // Physics world cur
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static PolygonData CreateRandomPolygon(int count, int minDistance, int maxDistance);        // Creates a random polygon shape with max vertex distance from polygon pivot
+static PolygonData CreateRandomPolygon(int count, float distance);                  // Creates a random polygon shape with max vertex distance from polygon pivot
 static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max);                // Creates a rectangle polygon shape based on a min and max positions
 static void *PhysicsLoop(void *arg);                                                // Physics loop thread function
 static void PhysicsStep(void);                                                      // Physics steps calculations (dynamics, collisions and position corrections)
@@ -486,7 +487,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vecto
 }
 
 // Creates a new polygon physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, Vector2 pos, float density)
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, float distance, Vector2 pos, float density)
 {
     PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
     usedMemory += sizeof(PhysicsBodyData);
@@ -527,7 +528,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, Vector2 pos, float den
         newBody->orient = 0;
         newBody->shape.type = PHYSICS_POLYGON;
         newBody->shape.body = newBody;
-        newBody->shape.vertexData = CreateRandomPolygon(count, 25, 75);
+        newBody->shape.vertexData = CreateRandomPolygon(count, distance);
 
         // Calculate centroid and moment of inertia
         Vector2 center = { 0 };
@@ -601,6 +602,97 @@ PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 f)
 PHYSACDEF void PhysicsAddTorque(PhysicsBody body, float amount)
 {
     body->torque += amount;
+}
+
+// Shatters a polygon shape physics body to little physics bodies with explosion force
+PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
+{
+    if (body != NULL)
+    {
+        if (body->shape.type == PHYSICS_POLYGON)
+        {
+            PolygonData vertexData = body->shape.vertexData;
+            bool collision = false;
+
+            for (int i = 0; i < vertexData.vertexCount; i++)
+            {
+                Vector2 positionA = body->position;
+                Vector2 positionB = Mat2MultiplyVector2(vertexData.transform, Vector2Add(body->position, vertexData.vertices[i]));
+                int ii = (((i + 1) < vertexData.vertexCount) ? (i + 1) : 0);
+                Vector2 positionC = Mat2MultiplyVector2(vertexData.transform, Vector2Add(body->position, vertexData.vertices[ii]));
+
+                // Check collision between each triangle
+                float alpha = ((positionB.y - positionC.y)*(position.x - positionC.x) + (positionC.x - positionB.x)*(position.y - positionC.y))/
+                              ((positionB.y - positionC.y)*(positionA.x - positionC.x) + (positionC.x - positionB.x)*(positionA.y - positionC.y));
+
+                float beta = ((positionC.y - positionA.y)*(position.x - positionC.x) + (positionA.x - positionC.x)*(position.y - positionC.y))/
+                             ((positionB.y - positionC.y)*(positionA.x - positionC.x) + (positionC.x - positionB.x)*(positionA.y - positionC.y));
+
+                float gamma = 1.0f - alpha - beta;
+
+                if ((alpha > 0) && (beta > 0) & (gamma > 0))
+                {
+                    collision = true;
+                    break;
+                }
+            }
+
+            if (collision)
+            {
+                int count = vertexData.vertexCount;
+                Vector2 bodyPos = body->position;
+                Vector2 vertices[count];
+                Mat2 trans = vertexData.transform;
+                for (int i = 0; i < count; i++) vertices[i] = vertexData.vertices[i];
+
+                // Destroy shattered physics body
+                DestroyPhysicsBody(body);
+
+                for (int i = 0; i < count; i++)
+                {
+                    PhysicsBody newBody = CreatePhysicsBodyPolygon(3, 25, bodyPos, 10);
+
+                    PolygonData newData = { 0 };
+                    newData.vertexCount = 3;
+                    newData.transform = Mat2Radians(0);
+
+                    newData.vertices[0] = Mat2MultiplyVector2(trans, vertices[i]);
+                    int ii = (((i + 1) < count) ? (i + 1) : 0);
+                    newData.vertices[1] = Mat2MultiplyVector2(trans, vertexData.vertices[ii]);
+                    newData.vertices[2] = Vector2Subtract(position, bodyPos);
+
+                    // Calculate polygon faces normals
+                    for (int i = 0; i < newData.vertexCount; i++)
+                    {
+                        int ii = (((i + 1) < newData.vertexCount) ? (i + 1) : 0);
+                        Vector2 face = Vector2Subtract(newData.vertices[ii], newData.vertices[i]);
+                        
+                        newData.normals[i] = (Vector2){ face.y, -face.x };
+                        MathNormalize(&newData.normals[i]);
+                    }
+
+                    // Apply computed vertex data to new physics body shape
+                    newBody->shape.vertexData = newData;
+
+                    // Calculate explosion force direction
+                    Vector2 pointA = newBody->position;
+                    Vector2 pointB = Vector2Subtract(newData.vertices[1], newData.vertices[0]);
+                    pointB.x /= 2;
+                    pointB.y /= 2;
+                    Vector2 forceDirection = Vector2Subtract(Vector2Add(pointA, Vector2Add(newData.vertices[0], pointB)), newBody->position);
+                    MathNormalize(&forceDirection);
+                    forceDirection.x *= force;
+                    forceDirection.y *= force;
+
+                    // Apply force to new physics body
+                    PhysicsAddForce(newBody, forceDirection);
+                }
+            }
+        }
+    }
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] error when trying to shatter a null reference physics body");
+    #endif
 }
 
 // Draws all created physics bodies shapes
@@ -725,15 +817,13 @@ PHYSACDEF void ClosePhysics(void)
 // Module Internal Functions Definition
 //----------------------------------------------------------------------------------
 // Creates a random polygon shape with max vertex distance from polygon pivot
-static PolygonData CreateRandomPolygon(int count, int minDistance, int maxDistance)
+static PolygonData CreateRandomPolygon(int count, float distance)
 {
     PolygonData data = { 0 };
     data.vertexCount = count;
 
     float orient = GetRandomValue(0, 360);
     data.transform = Mat2Radians(orient*MATH_DEG2RAD);
-
-    int distance = GetRandomValue(minDistance, maxDistance);
 
     // Calculate polygon vertices positions
     for (int i = 0; i < data.vertexCount; i++)
