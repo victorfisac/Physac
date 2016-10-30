@@ -27,6 +27,10 @@
 *       internally in the library and input management and drawing functions must be provided by
 *       the user (check library implementation for further details).
 *
+*   #define PHYSAC_DEBUG
+*       Traces log messages when creating and destroying physics bodies and detects errors in physics 
+*       calculations and reference exceptions; it is useful for debug purposes
+*
 *   #define PHYSAC_MALLOC()
 *   #define PHYSAC_FREE()
 *       You can define your own malloc/free implementation replacing stdlib.h malloc()/free() functions.
@@ -59,7 +63,8 @@
 #ifndef PHYSAC_H
 #define PHYSAC_H
 
-// #define PHYSAC_STANDALONE
+// #define  PHYSAC_STANDALONE   // Note: it does not work yet
+// #define  PHYSAC_DEBUG
 #ifndef PHYSAC_STANDALONE
     #include "raylib.h"
 #endif
@@ -78,11 +83,16 @@
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     COLLISION_ITERATIONS            7
-#define     MAX_TIMESTEP                    0.02
 #define     MAX_PHYSICS_BODIES              2048
 #define     MAX_PHYSICS_MANIFOLDS           2048
 #define     PHYSAC_MAX_VERTICES             8
+
+#define     DESIRED_DELTATIME               1.0/60.0
+#define     MAX_TIMESTEP                    0.02
+#define     COLLISION_ITERATIONS            100
+#define     PENETRATION_ALLOWANCE           0.05f
+#define     PENETRATION_CORRECTION          0.4f
+
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
 #define     PHYSAC_SHAPES_COLOR             GREEN
@@ -95,14 +105,14 @@
 // Types and Structures Definition
 // NOTE: Below types are required for PHYSAC_STANDALONE usage
 //----------------------------------------------------------------------------------
-#if defined(PHYSAC_STANDALONE)
+#ifdef PHYSAC_STANDALONE
     typedef struct Vector2 {
         float x;
         float y;
     } Vector2;
 
     // Boolean type
-    #if !defined(_STDBOOL_H)
+    #ifndef _STDBOOL_H
         typedef enum { false, true } bool;
         #define _STDBOOL_H
     #endif
@@ -190,15 +200,18 @@ PHYSACDEF void ClosePhysics(void);                                  // Unitializ
 *
 ************************************************************************************/
 
-#if defined(PHYSAC_IMPLEMENTATION)
+#ifdef PHYSAC_IMPLEMENTATION
 
 #ifndef PHYSAC_NO_THREADS
     #include <pthread.h>                    // Required for: pthread_t, pthread_create()
 #endif
 
-#include <math.h>                           // Required for: sqrt()
+#ifdef PHYSAC_DEBUG
+    #include <stdio.h>                      // Required for: printf()
+#endif
+
 #include <stdlib.h>                         // Required for: malloc(), free()
-#include "C:\raylib\raylib\src\utils.h"     // Required for: TraceLog()
+#include <math.h>                           // Required for: cos(), sin(), fabs(), sqrt()
 
 // Functions required to query time on Windows
 int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
@@ -207,7 +220,6 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     DESIRED_DELTATIME           1.0/60.0
 #define     min(a,b)                    (((a)<(b))?(a):(b))
 #define     max(a,b)                    (((a)>(b))?(a):(b))
 #define     MATH_FLT_MAX                3.402823466e+38f
@@ -215,8 +227,6 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 #define     MATH_EPSILON                0.000001f
 #define     MATH_DEG2RAD                (MATH_PI/180.0f)
 #define     MATH_RAD2DEG                (180.0f/MATH_PI)
-#define     PENETRATION_ALLOWANCE       0.05f
-#define     PENETRATION_CORRECTION      0.4f
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -288,7 +298,9 @@ static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                          
 // Initializes physics values, pointers and creates physics loop thread
 PHYSACDEF void InitPhysics(Vector2 gravity)
 {
-    TraceLog(WARNING, "[PHYSAC] physics module initialized successfully");
+    #ifdef PHYSAC_DEBUG
+        printf("[PHYSAC] physics module initialized successfully\n");
+    #endif
 
     // Initialize world gravity
     gravityForce = gravity;
@@ -356,9 +368,13 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
 
-        TraceLog(WARNING, "[PHYSAC] created circle physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] created circle physics body id %i\n", newBody->id);
+        #endif
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
+    #endif
 
     return newBody;
 }
@@ -457,11 +473,15 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vecto
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
-        
-        TraceLog(WARNING, "[PHYSAC] created polygon physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
+        #endif
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
-    
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
+    #endif
+
     return newBody;
 }
 
@@ -559,11 +579,15 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, Vector2 pos, float den
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
-        
-        TraceLog(WARNING, "[PHYSAC] created polygon physics body id %i [USED RAM: %i bytes]", newBody->id, usedMemory);
+
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
+        #endif
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics body creation failed because there is any available id to use");
-    
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
+    #endif
+
     return newBody;
 }
 
@@ -663,8 +687,10 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
             }
         }
 
-        if (index == -1) TraceLog(ERROR, "[PHYSAC] cannot find body id %i in pointers array", id);
-        
+        #ifdef PHYSAC_DEBUG
+            if (index == -1) printf("[PHYSAC] cannot find body id %i in pointers array\n", id);
+        #endif
+
         // Free body allocated memory
         PHYSAC_FREE(bodies[index]);
         usedMemory -= sizeof(PhysicsBodyData);
@@ -679,9 +705,13 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
         // Update physics bodies count
         physicsBodiesCount--;
 
-        TraceLog(WARNING, "[PHYSAC] destroyed physics body id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
+        #ifdef PHYSAC_DEBUG
+            printf("[PHYSAC] destroyed physics body id %i\n", id);
+        #endif
     }
-    else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced body");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] error trying to destroy a null referenced body\n");
+    #endif
 }
 
 // Unitializes physics pointers and exits physics loop thread
@@ -689,21 +719,6 @@ PHYSACDEF void ClosePhysics(void)
 {
     // Exit physics loop thread
     physicsThreadEnabled = false;
-
-    // Unitialize physics bodies dynamic memory allocations
-    int currentCount = physicsBodiesCount;
-    for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
-
-    // Unitialize physics manifolds dynamic memory allocations
-    for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
-
-    #ifndef PHYSAC_NO_THREADS
-        pthread_join(physicsThreadId, NULL);
-    #endif
-
-    if (physicsBodiesCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated bodies [USED RAM: %i bytes]", physicsBodiesCount, usedMemory);
-    else if (physicsManifoldsCount > 0 || usedMemory > 0) TraceLog(WARNING, "[PHYSAC] physics module closed with %i still allocated manifolds [USED RAM: %i bytes]", physicsManifoldsCount, usedMemory);
-    else TraceLog(WARNING, "[PHYSAC] physics module closed successfully");
 }
 
 //----------------------------------------------------------------------------------
@@ -769,7 +784,9 @@ static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max)
 // Physics loop thread function
 static void *PhysicsLoop(void *arg)
 {
-    TraceLog(WARNING, "[PHYSAC] physics thread created with successfully");
+    #ifdef PHYSAC_DEBUG
+        printf("[PHYSAC] physics thread created with successfully\n");
+    #endif
 
     // Initialize physics loop thread values
     physicsThreadEnabled = true;
@@ -803,6 +820,23 @@ static void *PhysicsLoop(void *arg)
         // Record the starting of this frame
         startTime = currentTime;
     }
+
+    // Unitialize physics bodies dynamic memory allocations
+    int currentCount = physicsBodiesCount;
+    for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
+
+    // Unitialize physics manifolds dynamic memory allocations
+    for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
+
+    #ifndef PHYSAC_NO_THREADS
+        pthread_join(physicsThreadId, NULL);
+    #endif
+
+    #ifdef PHYSAC_DEBUG
+        if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
+        else if (physicsManifoldsCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated manifolds [MEMORY: %i bytes]\n", physicsManifoldsCount, usedMemory);
+        else printf("[PHYSAC] physics module closed successfully\n");
+    #endif
 
     return NULL;
 }
@@ -918,11 +952,10 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         // Add new body to bodies pointers array and update bodies count
         contacts[physicsManifoldsCount] = newManifold;
         physicsManifoldsCount++;
-
-        // Avoided trace log due to bad performance for tracing messages each physics step
-        // TraceLog(WARNING, "[PHYSAC] created physics manifold id %i with physics bodies id %i and %i [USED RAM: %i bytes]", newManifold->id, newManifold->bodyA->id, newManifold->bodyB->id, usedMemory);
     }
-    else TraceLog(ERROR, "[PHYSAC] new physics manifold creation failed because there is any available id to use");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] new physics manifold creation failed because there is any available id to use\n");
+    #endif
 
     return newManifold;
 }
@@ -944,7 +977,9 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
             }
         }
 
-        if (index == -1) TraceLog(ERROR, "[PHYSAC] cannot find manifold id %i in pointers array", id);
+        #ifdef PHYSAC_DEBUG
+            if (index == -1) printf("[PHYSAC] cannot find manifold id %i in pointers array\n", id);
+        #endif
 
         // Free manifold allocated memory
         PHYSAC_FREE(contacts[index]);
@@ -959,11 +994,10 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
 
         // Update physics manifolds count
         physicsManifoldsCount--;
-
-        // Avoided trace log due to bad performance for tracing messages each physics step
-        // TraceLog(WARNING, "[PHYSAC] destroyed physics manifold id %i (index: %i) [USED RAM: %i bytes]", id, index, usedMemory);
     }
-    else TraceLog(ERROR, "[PHYSAC] error trying to destroy a null referenced manifold");
+    #ifdef PHYSAC_DEBUG
+        else printf("[PHYSAC] error trying to destroy a null referenced manifold\n");
+    #endif
 }
 
 // Solves a created physics manifold between two physics bodies
@@ -1077,8 +1111,8 @@ static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold)
     }
 
     // Determine which voronoi region of the edge center of circle lies within
-    float dot1 = MathDot((Vector2){ center.x - v1.x, center.y - v1.y }, (Vector2){ v2.x - v1.x, v2.y - v1.y });
-    float dot2 = MathDot((Vector2){ center.x - v2.x, center.y - v2.y }, (Vector2){ v1.x - v2.x, v1.y - v2.y });
+    float dot1 = MathDot(Vector2Subtract(center, v1), Vector2Subtract(v2, v1));
+    float dot2 = MathDot(Vector2Subtract(center, v2), Vector2Subtract(v1, v2));
     manifold->penetration = A->shape.radius - separation;
 
     if (dot1 <= 0) // Closest to v1
@@ -1293,7 +1327,7 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
     PhysicsBody B = manifold->bodyB;
 
     // Early out and positional correct if both objects have infinite mass
-    if (fabs(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass) <= MATH_EPSILON)
+    if (fabs(A->inverseMass + B->inverseMass) <= MATH_EPSILON)
     {
         A->velocity = (Vector2){ 0 };        
         B->velocity = (Vector2){ 0 };
@@ -1398,20 +1432,23 @@ static void IntegratePhysicsVelocity(PhysicsBody body)
 // Corrects physics bodies positions based on manifolds collision information
 static void CorrectPhysicsPositions(PhysicsManifold manifold)
 {
-    Vector2 correction;
-    correction.x = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass))*manifold->normal.x*PENETRATION_CORRECTION;
-    correction.y = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(manifold->bodyA->inverseMass + manifold->bodyB->inverseMass))*manifold->normal.y*PENETRATION_CORRECTION;
+    PhysicsBody A = manifold->bodyA;
+    PhysicsBody B = manifold->bodyB;
 
-    if (manifold->bodyA->enabled)
+    Vector2 correction = { 0 };
+    correction.x = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(A->inverseMass + B->inverseMass))*manifold->normal.x*PENETRATION_CORRECTION;
+    correction.y = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(A->inverseMass + B->inverseMass))*manifold->normal.y*PENETRATION_CORRECTION;
+
+    if (A->enabled)
     {
-        manifold->bodyA->position.x -= correction.x*manifold->bodyA->inverseMass;
-        manifold->bodyA->position.y -= correction.y*manifold->bodyA->inverseMass;
+        A->position.x -= correction.x*A->inverseMass;
+        A->position.y -= correction.y*A->inverseMass;
     }
 
-    if (manifold->bodyB->enabled)
+    if (B->enabled)
     {
-        manifold->bodyB->position.x += correction.x*manifold->bodyB->inverseMass;
-        manifold->bodyB->position.y += correction.y*manifold->bodyB->inverseMass;
+        B->position.x += correction.x*B->inverseMass;
+        B->position.y += correction.y*B->inverseMass;
     }
 }
 
