@@ -60,17 +60,17 @@
 *
 **********************************************************************************************/
 
-#ifndef PHYSAC_H
+#if !defined(PHYSAC_H)
 #define PHYSAC_H
 
 // #define  PHYSAC_STANDALONE   // Note: it does not work yet
 // #define  PHYSAC_DEBUG
 
 #define PHYSAC_STATIC
-#ifdef PHYSAC_STATIC
+#if defined(PHYSAC_STATIC)
     #define PHYSACDEF static            // Functions just visible to module including this file
 #else
-    #ifdef __cplusplus
+    #if defined(__cplusplus)
         #define PHYSACDEF extern "C"    // Functions visible from other files (no name mangling of functions in C++)
     #else
         #define PHYSACDEF extern        // Functions visible from other files
@@ -102,14 +102,15 @@
 // Types and Structures Definition
 // NOTE: Below types are required for PHYSAC_STANDALONE usage
 //----------------------------------------------------------------------------------
-#ifdef PHYSAC_STANDALONE
+#if defined(PHYSAC_STANDALONE)
+    // Vector2 type
     typedef struct Vector2 {
         float x;
         float y;
     } Vector2;
 
     // Boolean type
-    #ifndef _STDBOOL_H
+    #if !defined(_STDBOOL_H)
         typedef enum { false, true } bool;
         #define _STDBOOL_H
     #endif
@@ -120,6 +121,7 @@ typedef enum PhysicsShapeType { PHYSICS_CIRCLE, PHYSICS_POLYGON } PhysicsShapeTy
 // Previously defined to be used in PhysicsShape struct as circular dependencies
 typedef struct PhysicsBodyData *PhysicsBody;
 
+// Mat2 type (used for polygon shape rotation matrix)
 typedef struct Mat2
 {
     float m00;
@@ -175,6 +177,15 @@ typedef struct PhysicsManifoldData {
     float sf;                       // Mixed static friction during collision
 } PhysicsManifoldData, *PhysicsManifold;
 
+#if defined(__cplusplus)
+extern "C" {            // Prevents name mangling of functions
+#endif
+
+//----------------------------------------------------------------------------------
+// Global Variables Definition
+//----------------------------------------------------------------------------------
+//...
+
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
@@ -190,6 +201,10 @@ PHYSACDEF void DrawPhysicsContacts(void);                                       
 PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                                    // Unitializes and destroy a physics body
 PHYSACDEF void ClosePhysics(void);                                                      // Unitializes physics pointers and closes physics loop thread
 
+#if defined(__cplusplus)
+}
+#endif
+
 #endif // PHYSAC_H
 
 /***********************************************************************************
@@ -198,22 +213,27 @@ PHYSACDEF void ClosePhysics(void);                                              
 *
 ************************************************************************************/
 
-#ifdef PHYSAC_IMPLEMENTATION
+#if defined(PHYSAC_IMPLEMENTATION)
 
-#ifndef PHYSAC_NO_THREADS
+#if !defined(PHYSAC_NO_THREADS)
     #include <pthread.h>                    // Required for: pthread_t, pthread_create()
 #endif
 
-#ifdef PHYSAC_DEBUG
+#if defined(PHYSAC_DEBUG)
     #include <stdio.h>                      // Required for: printf()
 #endif
 
 #include <stdlib.h>                         // Required for: malloc(), free()
 #include <math.h>                           // Required for: cos(), sin(), fabs(), sqrt()
 
-// Functions required to query time on Windows
-int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
-int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
+#if defined(_WIN32)
+    // Functions required to query time on Windows
+    int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
+    int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
+#elif defined(__linux)
+    #include <sys/time.h>       // Required for: timespec
+    #include <time.h>           // Required for: clock_gettime()
+#endif
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -234,12 +254,15 @@ int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-#ifndef PHYSAC_NO_THREADS
+#if !defined(PHYSAC_NO_THREADS)
     static pthread_t physicsThreadId;                       // Physics thread id
 #endif
 static unsigned int usedMemory = 0;                         // Total allocated dynamic memory
 static bool physicsThreadEnabled = false;                   // Physics thread enabled state
 static double currentTime = 0;                              // Current time in milliseconds
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
+    static double baseTime = 0;                             // Android and RPI platforms base time
+#endif
 static double startTime = 0;                                // Start time in milliseconds
 static double deltaTime = 0;                                // Delta time used for physics steps
 static double accumulator = 0;                              // Physics time step delta time accumulator
@@ -273,6 +296,7 @@ static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape A, PhysicsSha
 static void FindIncidentFace(Vector2 *v0, Vector2 *v1, PhysicsShape ref, PhysicsShape inc, int index);      // Finds two polygon shapes incident face
 static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB);                // Calculates clipping based on a normal and two faces
 static bool BiasGreaterThan(float a, float b);                                      // Check if values are between bias range
+static void InitTimer();                                                            // Initializes hi-resolution timer
 static double GetCurrentTime(void);                                                 // Get current time in milliseconds
 static void MathClamp(double *value, double min, double max);                       // Clamp a value in a range
 static Vector2 MathCross(float a, Vector2 v);                                       // Returns the cross product of a vector and a value
@@ -296,14 +320,14 @@ static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                          
 // Initializes physics values, pointers and creates physics loop thread
 PHYSACDEF void InitPhysics(Vector2 gravity)
 {
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         printf("[PHYSAC] physics module initialized successfully\n");
     #endif
 
     // Initialize world gravity
     gravityForce = gravity;
 
-    #ifndef PHYSAC_NO_THREADS
+    #if !defined(PHYSAC_NO_THREADS)
         // NOTE: if defined, user will need to create a thread for PhysicsThread function manually
         // Create physics thread using POSIXS thread libraries
         pthread_create(&physicsThreadId, NULL, &PhysicsLoop, NULL);
@@ -366,11 +390,11 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
 
-        #ifdef PHYSAC_DEBUG
+        #if defined(PHYSAC_DEBUG)
             printf("[PHYSAC] created circle physics body id %i\n", newBody->id);
         #endif
     }
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
     #endif
 
@@ -472,11 +496,11 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vecto
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
 
-        #ifdef PHYSAC_DEBUG
+        #if defined(PHYSAC_DEBUG)
             printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
         #endif
     }
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
     #endif
 
@@ -578,11 +602,11 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, float distance, Vector
         bodies[physicsBodiesCount] = newBody;
         physicsBodiesCount++;
 
-        #ifdef PHYSAC_DEBUG
+        #if defined(PHYSAC_DEBUG)
             printf("[PHYSAC] created polygon physics body id %i\n", newBody->id);
         #endif
     }
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
     #endif
 
@@ -687,7 +711,7 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
             }
         }
     }
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         else printf("[PHYSAC] error when trying to shatter a null reference physics body");
     #endif
 }
@@ -776,7 +800,7 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
             }
         }
 
-        #ifdef PHYSAC_DEBUG
+        #if defined(PHYSAC_DEBUG)
             if (index == -1) printf("[PHYSAC] cannot find body id %i in pointers array\n", id);
         #endif
 
@@ -794,11 +818,11 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
         // Update physics bodies count
         physicsBodiesCount--;
 
-        #ifdef PHYSAC_DEBUG
+        #if defined(PHYSAC_DEBUG)
             printf("[PHYSAC] destroyed physics body id %i\n", id);
         #endif
     }
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         else printf("[PHYSAC] error trying to destroy a null referenced body\n");
     #endif
 }
@@ -871,7 +895,7 @@ static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max)
 // Physics loop thread function
 static void *PhysicsLoop(void *arg)
 {
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         printf("[PHYSAC] physics thread created with successfully\n");
     #endif
 
@@ -880,7 +904,7 @@ static void *PhysicsLoop(void *arg)
     accumulator = 0;
 
     // Initialize high resolution timer
-    startTime = GetCurrentTime();
+    InitTimer();
 
     // Physics update loop
     while (physicsThreadEnabled)
@@ -915,11 +939,11 @@ static void *PhysicsLoop(void *arg)
     // Unitialize physics manifolds dynamic memory allocations
     for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
 
-    #ifndef PHYSAC_NO_THREADS
+    #if !defined(PHYSAC_NO_THREADS)
         pthread_join(physicsThreadId, NULL);
     #endif
 
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
         else if (physicsManifoldsCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated manifolds [MEMORY: %i bytes]\n", physicsManifoldsCount, usedMemory);
         else printf("[PHYSAC] physics module closed successfully\n");
@@ -1040,7 +1064,7 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         contacts[physicsManifoldsCount] = newManifold;
         physicsManifoldsCount++;
     }
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         else printf("[PHYSAC] new physics manifold creation failed because there is any available id to use\n");
     #endif
 
@@ -1064,7 +1088,7 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
             }
         }
 
-        #ifdef PHYSAC_DEBUG
+        #if defined(PHYSAC_DEBUG)
             if (index == -1) printf("[PHYSAC] cannot find manifold id %i in pointers array\n", id);
         #endif
 
@@ -1082,7 +1106,7 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
         // Update physics manifolds count
         physicsManifoldsCount--;
     }
-    #ifdef PHYSAC_DEBUG
+    #if defined(PHYSAC_DEBUG)
         else printf("[PHYSAC] error trying to destroy a null referenced manifold\n");
     #endif
 }
@@ -1680,17 +1704,38 @@ static bool BiasGreaterThan(float a, float b)
     return (a >= (b*0.95f + a*0.01f));
 }
 
+// Initializes hi-resolution timer
+static void InitTimer()
+{
+    #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) == 0) baseTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;
+    #endif
+
+    startTime = GetCurrentTime();
+}
+
 // Get current time in milliseconds
 static double GetCurrentTime(void)
 {
     double time = 0;
 
-    unsigned long long int clockFrequency, currentTime;
+    #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+        unsigned long long int clockFrequency, currentTime;
 
-    QueryPerformanceFrequency(&clockFrequency);
-    QueryPerformanceCounter(&currentTime);
+        QueryPerformanceFrequency(&clockFrequency);
+        QueryPerformanceCounter(&currentTime);
 
-    time = (double)((double)currentTime/clockFrequency)*1000;
+        time = (double)((double)currentTime/clockFrequency)*1000;
+    #endif
+
+    #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        uint64_t temp = (uint64_t)ts.tv_sec*1000000000LLU + (uint64_t)ts.tv_nsec;
+
+        time = (double)(temp - baseTime)*1e-9;
+    #endif
 
     return time;
 }
