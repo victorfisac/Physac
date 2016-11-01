@@ -314,6 +314,7 @@ static Vector2 Mat2AxisX(Mat2 matrix);                                          
 static Vector2 Mat2AxisY(Mat2 matrix);                                              // Returns m01 and m11 as a Vector2 struct of a matrix 2x2
 static Mat2 Mat2Transpose(Mat2 m);                                                  // Returns the transpose of a given matrix 2x2
 static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                              // Multiplies a vector by a matrix 2x2
+
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
@@ -766,7 +767,7 @@ PHYSACDEF void DrawPhysicsContacts(void)
     for (int i = 0; i < physicsManifoldsCount; i++)
     {
         PhysicsManifold manifold = contacts[i];
-        
+
         if (manifold != NULL)
         {
             for (int j = 0; j < manifold->contactsCount; j++)
@@ -831,6 +832,10 @@ PHYSACDEF void ClosePhysics(void)
 {
     // Exit physics loop thread
     physicsThreadEnabled = false;
+
+    #if !defined(PHYSAC_NO_THREADS)
+        pthread_join(physicsThreadId, NULL);
+    #endif
 }
 
 //----------------------------------------------------------------------------------
@@ -910,7 +915,7 @@ static void *PhysicsLoop(void *arg)
     {
         // Calculate current time
         currentTime = GetCurrentTime();
-        
+
         // Calculate current delta time
         deltaTime = currentTime - startTime;
 
@@ -926,7 +931,7 @@ static void *PhysicsLoop(void *arg)
             PhysicsStep();
             accumulator -= deltaTime;
         }
-        
+
         // Record the starting of this frame
         startTime = currentTime;
     }
@@ -936,10 +941,6 @@ static void *PhysicsLoop(void *arg)
 
     // Unitialize physics manifolds dynamic memory allocations
     for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
-
-    #if !defined(PHYSAC_NO_THREADS)
-        pthread_join(physicsThreadId, NULL);
-    #endif
 
     #if defined(PHYSAC_DEBUG)
         if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
@@ -1094,7 +1095,7 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
         PHYSAC_FREE(contacts[index]);
         usedMemory -= sizeof(PhysicsManifoldData);
         contacts[index] = NULL;
-        
+
         // Reorder physics manifolds pointers array and its catched index
         for (int i = index; i < physicsManifoldsCount; i++)
         {
@@ -1391,7 +1392,7 @@ static void IntegratePhysicsForces(PhysicsBody body)
         body->velocity.x += gravityForce.x*(deltaTime/2);
         body->velocity.y += gravityForce.y*(deltaTime/2);
     }
-    
+
     body->angularVelocity += body->torque*body->inverseInertia*(deltaTime/2);
 }
 
@@ -1705,11 +1706,7 @@ static void InitTimer()
 {
     #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
         struct timespec now;
-
-        if (clock_gettime(CLOCK_MONOTONIC, &now) == 0)  // Success
-        {
-            baseTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;
-        }
+        if (clock_gettime(CLOCK_MONOTONIC, &now) == 0) baseTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;
     #endif
 
     startTime = GetCurrentTime();
