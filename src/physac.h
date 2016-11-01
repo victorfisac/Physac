@@ -1705,7 +1705,11 @@ static void InitTimer()
 {
     #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
         struct timespec now;
-        if (clock_gettime(CLOCK_MONOTONIC, &now) == 0) baseTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;
+
+        if (clock_gettime(CLOCK_MONOTONIC, &now) == 0)  // Success
+        {
+            baseTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;
+        }
     #endif
 
     startTime = GetCurrentTime();
@@ -1730,7 +1734,7 @@ static double GetCurrentTime(void)
         clock_gettime(CLOCK_MONOTONIC, &ts);
         uint64_t temp = (uint64_t)ts.tv_sec*1000000000LLU + (uint64_t)ts.tv_nsec;
 
-        time = (double)(temp - baseTime)*1e-9;
+        time = (double)((double)(temp - baseTime)*1e-6);
     #endif
 
     return time;
