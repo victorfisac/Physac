@@ -40,8 +40,8 @@ int main()
     A->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
 
     // Create floor rectangle physics body
-    PhysicsBody C = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, (Vector2){ -500, -50 }, (Vector2){ 500, 75 }, 10);
-    C->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    PhysicsBody B = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, (Vector2){ -500, -50 }, (Vector2){ 500, 75 }, 10);
+    B->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -54,11 +54,11 @@ int main()
             InitPhysics((Vector2){ 0, 9.81f/1000 });
 
             // Create obstacle circle physics body
-            PhysicsBody A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
+            A = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
             A->enabled = false;
 
-            PhysicsBody C = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, (Vector2){ -500, -50 }, (Vector2){ 500, 75 }, 10);
-            C->enabled = false;
+            B = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, (Vector2){ -500, -50 }, (Vector2){ 500, 75 }, 10);
+            B->enabled = false;
 
             closedPhysics = false;
         }
@@ -86,6 +86,8 @@ int main()
         BeginDrawing();
 
             ClearBackground(BLACK);
+            
+            DrawFPS(screenWidth - 90, screenHeight - 30);
 
             DrawPhysicsBodies();    // Draws all created physics bodies shapes
             if (debug) DrawPhysicsContacts();
