@@ -91,8 +91,8 @@ int main()
             if (debug) DrawPhysicsContacts();
 
             DrawText("Left mouse button to create a polygon", 10, 10, 10, WHITE);
-            DrawText("Right mouse button to create a circle", 10, 30, 10, WHITE);
-            DrawText("P to switch debug state", 10, 50, 10, WHITE);
+            DrawText("Right mouse button to create a circle", 10, 25, 10, WHITE);
+            DrawText("Press 'P' to switch debug state\nPress 'R' to reset example", 10, 40, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);

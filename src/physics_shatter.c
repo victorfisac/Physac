@@ -60,7 +60,7 @@ int main()
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            for (int i = physicsBodiesCount; i >= 0; i--) PhysicsShatter(bodies[i], GetMousePosition(), 100000);
+            for (int i = physicsBodiesCount; i >= 0; i--) PhysicsShatter(bodies[i], GetMousePosition(), 1000000);
         }
         //----------------------------------------------------------------------------------
 
@@ -72,7 +72,7 @@ int main()
 
             DrawPhysicsBodies();    // Draws all created physics bodies shapes
             
-            DrawText("Left mouse button in polygon area to shatter body", 10, 10, 10, WHITE);
+            DrawText("Left mouse button in polygon area to shatter body\nPress 'R' to reset example", 10, 10, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);
