@@ -34,7 +34,7 @@ typedef struct *PhysicsBody {
     PhysicsShape shape;             // Physics body shape information (type, radius, vertices, normals)
 } *PhysicsBody;
 ```
-By the way, the header contains a few customizable define values. I set the values that gived me the best results.
+The header contains a few customizable define values. I set the values that gived me the best results.
 
 ```c
 #define     DESIRED_DELTATIME               1.0/60.0
@@ -44,7 +44,7 @@ By the way, the header contains a few customizable define values. I set the valu
 #define     PENETRATION_CORRECTION          0.4f
 ```
 
-These are the Physac API functions usables by the user in its program:
+The Physac API functions availables for the user are the following:
 
 ```c
 // Initializes physics values, pointers and creates physics loop thread
