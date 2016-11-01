@@ -131,10 +131,10 @@ typedef struct Mat2
 } Mat2;
 
 typedef struct PolygonData {
-    Mat2 transform;                             // Vertices transform matrix 2x2
     unsigned int vertexCount;                   // Current used vertex and normals count
     Vector2 vertices[PHYSAC_MAX_VERTICES];      // Polygon vertex positions vectors
     Vector2 normals[PHYSAC_MAX_VERTICES];       // Polygon vertex normals vectors
+    Mat2 transform;                             // Vertices transform matrix 2x2
 } PolygonData;
 
 typedef struct PhysicsShape {
@@ -740,7 +740,6 @@ PHYSACDEF void DrawPhysicsBodies(void)
                 case PHYSICS_POLYGON:
                 {
                     PolygonData data = body->shape.vertexData;
-                    Vector2 position = { 0 };
 
                     for (int i = 0; i < data.vertexCount; i++)
                     {                        
@@ -933,7 +932,6 @@ static void *PhysicsLoop(void *arg)
     }
 
     // Unitialize physics bodies dynamic memory allocations
-    int currentCount = physicsBodiesCount;
     for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
 
     // Unitialize physics manifolds dynamic memory allocations
@@ -1326,10 +1324,8 @@ static void SolvePhysicsPolygonToPolygon(PhysicsManifold manifold)
     Vector2 incidentFace[2];
     FindIncidentFace(&incidentFace[0], &incidentFace[1], refPoly, incPoly, referenceIndex);
 
-    PolygonData refData = refPoly.vertexData;
-    PolygonData incData = incPoly.vertexData;
-
     // Setup reference face vertices
+    PolygonData refData = refPoly.vertexData;
     Vector2 v1 = refData.vertices[referenceIndex];
     referenceIndex = (((referenceIndex + 1) < refData.vertexCount) ? (referenceIndex + 1) : 0);
     Vector2 v2 = refData.vertices[referenceIndex];
