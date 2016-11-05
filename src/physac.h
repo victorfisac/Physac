@@ -63,7 +63,7 @@
 #if !defined(PHYSAC_H)
 #define PHYSAC_H
 
-// #define  PHYSAC_STANDALONE   // Note: it does not work yet
+// #define  PHYSAC_STANDALONE
 // #define  PHYSAC_DEBUG
 
 #define PHYSAC_STATIC
@@ -83,6 +83,7 @@
 #define     MAX_PHYSICS_BODIES              2048
 #define     MAX_PHYSICS_MANIFOLDS           2048
 #define     PHYSAC_MAX_VERTICES             8
+#define     PHYSAC_CIRCLE_VERTICES          24
 
 #define     DESIRED_DELTATIME               1.0/60.0
 #define     MAX_TIMESTEP                    0.02
@@ -92,11 +93,6 @@
 
 #define     PHYSAC_MALLOC(size)             malloc(size)
 #define     PHYSAC_FREE(ptr)                free(ptr)
-#define     PHYSAC_SHAPES_COLOR             GREEN
-#define     PHYSAC_INFO_COLOR               WHITE
-#define     PHYSAC_CONTACTS_RADIUS          3
-#define     PHYSAC_CONTACTS_NORMAL          10
-#define     PHYSAC_CONTACTS_COLOR           RED
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -189,16 +185,22 @@ extern "C" {            // Prevents name mangling of functions
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
-PHYSACDEF void InitPhysics(Vector2 gravity);                                                                // Initializes physics values, pointers and creates physics loop thread
+PHYSACDEF void InitPhysics(void);                                                                           // Initializes physics values, pointers and creates physics loop thread
+PHYSACDEF bool IsPhysicsEnabled(void);                                                                      // Returns true if physics thread is currently enabled
+PHYSACDEF void SetPhysicsGravity(float x, float y);                                                         // Sets physics global gravity force
 PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);                    // Creates a new circle physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density);     // Creates a new rectangle physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int vertex, float distance, Vector2 pos, float density);     // Creates a new polygon physics body with generic parameters
-PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 f);                            // Adds a force to a physics body
+PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float height, float density);    // Creates a new rectangle physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int sides, float density);        // Creates a new polygon physics body with generic parameters
+PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 force);                        // Adds a force to a physics body
 PHYSACDEF void PhysicsAddTorque(PhysicsBody body, float amount);                        // Adds a angular force to a physics body
 PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force);         // Shatters a polygon shape physics body to little physics bodies with explosion force
-PHYSACDEF void DrawPhysicsBodies(void);                                                 // Draws all created physics bodies shapes
-PHYSACDEF void DrawPhysicsContacts(void);                                               // Draws all calculated physics contacts points and its normals
+PHYSACDEF int GetPhysicsBodiesCount(void);                                              // Returns the current amount of created physics bodies
+PHYSACDEF PhysicsBody GetPhysicsBody(int index);                                        // Returns a physics body of the bodies pool at a specific index
+PHYSACDEF int GetPhysicsShapeType(int index);                                           // Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON)
+PHYSACDEF int GetPhysicsShapeVerticesCount(int index);                                  // Returns the amount of vertices of a physics body shape
+PHYSACDEF Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex);                  // Returns transformed position of a body shape (body position + vertex transformed position)
 PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                                    // Unitializes and destroy a physics body
+PHYSACDEF void ResetPhysics(void);                                                      // Destroys created physics bodies and manifolds and resets global values
 PHYSACDEF void ClosePhysics(void);                                                      // Unitializes physics pointers and closes physics loop thread
 
 #if defined(__cplusplus)
@@ -223,8 +225,8 @@ PHYSACDEF void ClosePhysics(void);                                              
     #include <stdio.h>                      // Required for: printf()
 #endif
 
-#include <stdlib.h>                         // Required for: malloc(), free()
-#include <math.h>                           // Required for: cos(), sin(), fabs(), sqrt()
+#include <stdlib.h>                         // Required for: malloc(), free(), srand(), rand()
+#include <math.h>                           // Required for: cosf(), sinf(), fabs(), sqrtf()
 
 #if defined(_WIN32)
     // Functions required to query time on Windows
@@ -267,7 +269,7 @@ static double startTime = 0;                                // Start time in mil
 static double deltaTime = 0;                                // Delta time used for physics steps
 static double accumulator = 0;                              // Physics time step delta time accumulator
 static unsigned int stepsCount = 0;                         // Total physics steps processed
-static Vector2 gravityForce = { 0 };                        // Physics world gravity force
+static Vector2 gravityForce = { 0, 9.81f/1000 };            // Physics world gravity force
 static PhysicsBody bodies[MAX_PHYSICS_BODIES];              // Physics bodies pointers array
 static unsigned int physicsBodiesCount = 0;                 // Physics world current bodies counter
 static PhysicsManifold contacts[MAX_PHYSICS_MANIFOLDS];     // Physics bodies pointers array
@@ -276,17 +278,17 @@ static unsigned int physicsManifoldsCount = 0;              // Physics world cur
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static PolygonData CreateRandomPolygon(int count, float distance);                  // Creates a random polygon shape with max vertex distance from polygon pivot
-static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max);                // Creates a rectangle polygon shape based on a min and max positions
+static PolygonData CreateRandomPolygon(float radius, int sides);                    // Creates a random polygon shape with max vertex distance from polygon pivot
+static PolygonData CreateRectanglePolygon(Vector2 pos, Vector2 size);               // Creates a rectangle polygon shape based on a min and max positions
 static void *PhysicsLoop(void *arg);                                                // Physics loop thread function
 static void PhysicsStep(void);                                                      // Physics steps calculations (dynamics, collisions and position corrections)
 static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b);         // Creates a new physics manifold to solve collision
 static void DestroyPhysicsManifold(PhysicsManifold manifold);                       // Unitializes and destroys a physics manifold
 static void SolvePhysicsManifold(PhysicsManifold manifold);                         // Solves a created physics manifold between two physics bodies
-static void SolvePhysicsCircleToCircle(PhysicsManifold manifold);                   // Solves collision between two circle shape physics bodies
-static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold);                  // Solves collision between a circle to a polygon shape physics bodies
-static void SolvePhysicsPolygonToCircle(PhysicsManifold manifold);                  // Solves collision between a polygon to a circle shape physics bodies
-static void SolvePhysicsPolygonToPolygon(PhysicsManifold manifold);                 // Solves collision between two polygons shape physics bodies
+static void SolveCircleToCircle(PhysicsManifold manifold);                          // Solves collision between two circle shape physics bodies
+static void SolveCircleToPolygon(PhysicsManifold manifold);                         // Solves collision between a circle to a polygon shape physics bodies
+static void SolvePolygonToCircle(PhysicsManifold manifold);                         // Solves collision between a polygon to a circle shape physics bodies
+static void SolvePolygonToPolygon(PhysicsManifold manifold);                        // Solves collision between two polygons shape physics bodies
 static void IntegratePhysicsForces(PhysicsBody body);                               // Integrates physics forces into velocity
 static void InitializePhysicsManifolds(PhysicsManifold manifold);                   // Initializes physics manifolds to solve collisions
 static void IntegratePhysicsImpulses(PhysicsManifold manifold);                     // Integrates physics collisions impulses to solve collisions
@@ -298,6 +300,7 @@ static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB);            
 static bool BiasGreaterThan(float a, float b);                                      // Check if values are between bias range
 static void InitTimer();                                                            // Initializes hi-resolution timer
 static double GetCurrentTime(void);                                                 // Get current time in milliseconds
+static int GetRandomNumber(int min, int max);                                       // Returns a random number between min and max (both included)
 static void MathClamp(double *value, double min, double max);                       // Clamp a value in a range
 static Vector2 MathCross(float a, Vector2 v);                                       // Returns the cross product of a vector and a value
 static float MathCrossVector2(Vector2 a, Vector2 b);                                // Returns the cross product of two vectors
@@ -319,20 +322,30 @@ static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                          
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 // Initializes physics values, pointers and creates physics loop thread
-PHYSACDEF void InitPhysics(Vector2 gravity)
+PHYSACDEF void InitPhysics(void)
 {
     #if defined(PHYSAC_DEBUG)
         printf("[PHYSAC] physics module initialized successfully\n");
     #endif
-
-    // Initialize world gravity
-    gravityForce = gravity;
 
     #if !defined(PHYSAC_NO_THREADS)
         // NOTE: if defined, user will need to create a thread for PhysicsThread function manually
         // Create physics thread using POSIXS thread libraries
         pthread_create(&physicsThreadId, NULL, &PhysicsLoop, NULL);
     #endif
+}
+
+// Returns true if physics thread is currently enabled
+PHYSACDEF bool IsPhysicsEnabled(void)
+{
+    return physicsThreadEnabled;
+}
+
+// Sets physics global gravity force
+PHYSACDEF void SetPhysicsGravity(float x, float y)
+{
+    gravityForce.x = x;
+    gravityForce.y = y;
 }
 
 // Creates a new circle physics body with generic parameters
@@ -403,7 +416,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
 }
 
 // Creates a new rectangle physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density)
+PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float height, float density)
 {
     PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
     usedMemory += sizeof(PhysicsBodyData);
@@ -444,7 +457,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vecto
         newBody->orient = 0;
         newBody->shape.type = PHYSICS_POLYGON;
         newBody->shape.body = newBody;
-        newBody->shape.vertexData = CreateRectanglePolygon(min, max);
+        newBody->shape.vertexData = CreateRectanglePolygon(pos, (Vector2){ width, height });
 
         // Calculate centroid and moment of inertia
         Vector2 center = { 0 };
@@ -509,7 +522,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vecto
 }
 
 // Creates a new polygon physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, float distance, Vector2 pos, float density)
+PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int sides, float density)
 {
     PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
     usedMemory += sizeof(PhysicsBodyData);
@@ -550,7 +563,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, float distance, Vector
         newBody->orient = 0;
         newBody->shape.type = PHYSICS_POLYGON;
         newBody->shape.body = newBody;
-        newBody->shape.vertexData = CreateRandomPolygon(count, distance);
+        newBody->shape.vertexData = CreateRandomPolygon(radius, sides);
 
         // Calculate centroid and moment of inertia
         Vector2 center = { 0 };
@@ -615,15 +628,15 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(int count, float distance, Vector
 }
 
 // Adds a force to a physics body
-PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 f)
+PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 force)
 {
-    body->force = Vector2Add(body->force, f);
+    if (body != NULL) body->force = Vector2Add(body->force, force);
 }
 
 // Adds a angular force to a physics body
 PHYSACDEF void PhysicsAddTorque(PhysicsBody body, float amount)
 {
-    body->torque += amount;
+    if (body != NULL) body->torque += amount;
 }
 
 // Shatters a polygon shape physics body to little physics bodies with explosion force
@@ -672,7 +685,7 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
 
                 for (int i = 0; i < count; i++)
                 {
-                    PhysicsBody newBody = CreatePhysicsBodyPolygon(3, 25, bodyPos, 10);
+                    PhysicsBody newBody = CreatePhysicsBodyPolygon(bodyPos, 25, 3, 10);
 
                     PolygonData newData = { 0 };
                     newData.vertexCount = 3;
@@ -717,70 +730,119 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
     #endif
 }
 
-// Draws all created physics bodies shapes
-PHYSACDEF void DrawPhysicsBodies(void)
+// Returns the current amount of created physics bodies
+PHYSACDEF int GetPhysicsBodiesCount(void)
 {
-    for (int i = 0; i < physicsBodiesCount; i++)
-    {
-        PhysicsBody body = bodies[i];
+    return physicsBodiesCount;
+}
 
+// Returns a physics body of the bodies pool at a specific index
+PHYSACDEF PhysicsBody GetPhysicsBody(int index)
+{
+    if (index < physicsBodiesCount)
+    {
+        PhysicsBody body = bodies[index];
+        if (body != NULL) return body;
+        #if defined(PHYSAC_DEBUG)
+        else
+        {
+            printf("[PHYSAC] error when trying to get a null reference physics body");
+            return NULL;
+        }
+        #endif
+    }
+    #if defined(PHYSAC_DEBUG)
+    else
+    {
+        printf("[PHYSAC] physics body index is out of bounds");
+        return NULL;
+    }
+    #endif
+}
+
+// Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON)
+PHYSACDEF int GetPhysicsShapeType(int index)
+{
+    if (index < physicsBodiesCount)
+    {
+        PhysicsBody body = bodies[index];
+        if (body != NULL) return body->shape.type;
+        #if defined(PHYSAC_DEBUG)
+        else
+        {
+            printf("[PHYSAC] error when trying to get a null reference physics body");
+            return -1;
+        }
+        #endif
+    }
+    #if defined(PHYSAC_DEBUG)
+    else
+    {
+        printf("[PHYSAC] physics body index is out of bounds");
+        return -1;
+    }
+    #endif
+}
+
+// Returns the amount of vertices of a physics body shape
+PHYSACDEF int GetPhysicsShapeVerticesCount(int index)
+{
+    if (index < physicsBodiesCount)
+    {
+        PhysicsBody body = bodies[index];
         if (body != NULL)
         {
-            switch (bodies[i]->shape.type)
+            switch (body->shape.type)
             {
-                case PHYSICS_CIRCLE:
-                {
-                    DrawCircleLines(body->position.x, body->position.y, body->shape.radius, PHYSAC_SHAPES_COLOR);
-
-                    Vector2 lineEndPos;
-                    lineEndPos.x = body->position.x + cos(body->orient)*body->shape.radius;
-                    lineEndPos.y = body->position.y + sin(body->orient)*body->shape.radius;
-
-                    DrawLineV(body->position, lineEndPos, PHYSAC_SHAPES_COLOR);
-                } break;
-                case PHYSICS_POLYGON:
-                {
-                    PolygonData data = body->shape.vertexData;
-
-                    for (int i = 0; i < data.vertexCount; i++)
-                    {                        
-                        // Draw vertex face with lines
-                        int ii = (((i + 1) < data.vertexCount) ? (i + 1) : 0);
-                        Vector2 vertexA = Mat2MultiplyVector2(data.transform, data.vertices[i]);
-                        Vector2 startPosition = Vector2Add(body->position, vertexA);
-
-                        Vector2 vertexB = Mat2MultiplyVector2(data.transform, data.vertices[ii]);
-                        Vector2 endPosition = Vector2Add(body->position, vertexB);
-
-                        DrawLineV(startPosition, endPosition, PHYSAC_SHAPES_COLOR);
-                    }
-                } break;
+                case PHYSICS_CIRCLE: return PHYSAC_CIRCLE_VERTICES; break;
+                case PHYSICS_POLYGON: return body->shape.vertexData.vertexCount; break;
                 default: break;
             }
         }
+        #if defined(PHYSAC_DEBUG)
+        else
+        {
+            printf("[PHYSAC] error when trying to get a null reference physics body");
+            return 0;
+        }
+        #endif
     }
+    #if defined(PHYSAC_DEBUG)
+    else
+    {
+        printf("[PHYSAC] physics body index is out of bounds");
+        return 0;
+    }
+    #endif
 }
 
-// Draws all calculated physics contacts points and its normals
-PHYSACDEF void DrawPhysicsContacts(void)
+// Returns transformed position of a body shape (body position + vertex transformed position)
+PHYSACDEF Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex)
 {
-    for (int i = 0; i < physicsManifoldsCount; i++)
+    Vector2 position = { 0 };
+
+    if (body != NULL)
     {
-        PhysicsManifold manifold = contacts[i];
-
-        if (manifold != NULL)
+        switch (body->shape.type)
         {
-            for (int j = 0; j < manifold->contactsCount; j++)
+            case PHYSICS_CIRCLE:
             {
-                DrawCircleV(manifold->contacts[j], PHYSAC_CONTACTS_RADIUS, PHYSAC_CONTACTS_COLOR);
-
-                Vector2 startPosition = manifold->contacts[j];
-                Vector2 endPosition = { startPosition.x + manifold->normal.x*PHYSAC_CONTACTS_NORMAL, startPosition.y + manifold->normal.y*PHYSAC_CONTACTS_NORMAL };
-
-                DrawLineV(startPosition, endPosition, PHYSAC_CONTACTS_COLOR);
-            }
+                position.x = body->position.x + cosf(360/PHYSAC_CIRCLE_VERTICES*vertex*MATH_DEG2RAD)*body->shape.radius;
+                position.y = body->position.y + sinf(360/PHYSAC_CIRCLE_VERTICES*vertex*MATH_DEG2RAD)*body->shape.radius;
+            } break;
+            case PHYSICS_POLYGON:
+            {
+                PolygonData vertexData = body->shape.vertexData;
+                position = Vector2Add(body->position, Mat2MultiplyVector2(vertexData.transform, vertexData.vertices[vertex]));
+            } break;
+            default: break;
         }
     }
+    #if defined(PHYSAC_DEBUG)
+    else printf("[PHYSAC] error when trying to get a null reference physics body");
+    #endif
+
+    return position;
 }
 
 // Unitializes and destroys a physics body
@@ -827,6 +889,38 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
     #endif
 }
 
+// Destroys created physics bodies and manifolds and resets global values
+PHYSACDEF void ResetPhysics(void)
+{
+    // Unitialize physics bodies dynamic memory allocations
+    for (int i = physicsBodiesCount - 1; i >= 0; i--)
+    {
+        PhysicsBody body = bodies[i];
+
+        if (body != NULL)
+        {
+            PHYSAC_FREE(body);
+            body = NULL;
+        }
+    }
+    
+    physicsBodiesCount = 0;
+
+    // Unitialize physics manifolds dynamic memory allocations
+    for (int i = physicsManifoldsCount - 1; i >= 0; i--)
+    {
+        PhysicsManifold manifold = contacts[i];
+
+        if (manifold != NULL)
+        {
+            PHYSAC_FREE(manifold);
+            manifold = NULL;
+        }
+    }
+
+    physicsManifoldsCount = 0;
+}
+
 // Unitializes physics pointers and exits physics loop thread
 PHYSACDEF void ClosePhysics(void)
 {
@@ -842,25 +936,25 @@ PHYSACDEF void ClosePhysics(void)
 // Module Internal Functions Definition
 //----------------------------------------------------------------------------------
 // Creates a random polygon shape with max vertex distance from polygon pivot
-static PolygonData CreateRandomPolygon(int count, float distance)
+static PolygonData CreateRandomPolygon(float radius, int sides)
 {
     PolygonData data = { 0 };
-    data.vertexCount = count;
+    data.vertexCount = sides;
 
-    float orient = GetRandomValue(0, 360);
+    float orient = GetRandomNumber(0, 360);
     data.transform = Mat2Radians(orient*MATH_DEG2RAD);
 
     // Calculate polygon vertices positions
     for (int i = 0; i < data.vertexCount; i++)
     {
-        data.vertices[i].x = cos(360/count*i*MATH_DEG2RAD)*distance;
-        data.vertices[i].y = sin(360/count*i*MATH_DEG2RAD)*distance;
+        data.vertices[i].x = cosf(360/sides*i*MATH_DEG2RAD)*radius;
+        data.vertices[i].y = sinf(360/sides*i*MATH_DEG2RAD)*radius;
     }
 
     // Calculate polygon faces normals
     for (int i = 0; i < data.vertexCount; i++)
     {
-        int ii = (((i + 1) < count) ? (i + 1) : 0);
+        int ii = (((i + 1) < sides) ? (i + 1) : 0);
         Vector2 face = Vector2Subtract(data.vertices[ii], data.vertices[i]);
         
         data.normals[i] = (Vector2){ face.y, -face.x };
@@ -871,17 +965,17 @@ static PolygonData CreateRandomPolygon(int count, float distance)
 }
 
 // Creates a rectangle polygon shape based on a min and max positions
-static PolygonData CreateRectanglePolygon(Vector2 min, Vector2 max)
+static PolygonData CreateRectanglePolygon(Vector2 pos, Vector2 size)
 {
     PolygonData data = { 0 };
 
     data.vertexCount = 4;
 
     // Calculate polygon vertices positions
-    data.vertices[0] = (Vector2){ min.x + max.x, min.y };
-    data.vertices[1] = (Vector2){ min.x + max.x, min.y + max.y };
-    data.vertices[2] = (Vector2){ min.x, min.y + max.y };
-    data.vertices[3] = (Vector2){ min.x, min.y };
+    data.vertices[0] = (Vector2){ pos.x + size.x/2, pos.y - size.y/2 };
+    data.vertices[1] = (Vector2){ pos.x + size.x/2, pos.y + size.y/2 };
+    data.vertices[2] = (Vector2){ pos.x - size.x/2, pos.y + size.y/2 };
+    data.vertices[3] = (Vector2){ pos.x - size.x/2, pos.y - size.y/2 };
 
     // Calculate polygon faces normals
     for (int i = 0; i < data.vertexCount; i++)
@@ -936,11 +1030,11 @@ static void *PhysicsLoop(void *arg)
         startTime = currentTime;
     }
 
-    // Unitialize physics bodies dynamic memory allocations
-    for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
-
     // Unitialize physics manifolds dynamic memory allocations
     for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
+
+    // Unitialize physics bodies dynamic memory allocations
+    for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
 
     #if defined(PHYSAC_DEBUG)
         if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
@@ -957,61 +1051,95 @@ static void PhysicsStep(void)
     stepsCount++;
 
     // Clear previous generated collisions information
-    for (int i = physicsManifoldsCount - 1; i >= 0; i--) DestroyPhysicsManifold(contacts[i]);
+    for (int i = physicsManifoldsCount - 1; i >= 0; i--)
+    {
+        PhysicsManifold manifold = contacts[i];
+        if (manifold != NULL) DestroyPhysicsManifold(manifold);
+    }
 
     // Generate new collision information
     for (int i = 0; i < physicsBodiesCount; i++)
     {
         PhysicsBody A = bodies[i];
-
-        for (int j = i + 1; j < physicsBodiesCount; j++)
+        
+        if (A != NULL)
         {
-            PhysicsBody B = bodies[j];
-
-            if ((A->inverseMass == 0) && (B->inverseMass == 0)) continue;
-
-            PhysicsManifold manifold = CreatePhysicsManifold(A, B);
-            SolvePhysicsManifold(manifold);
-
-            if (manifold->contactsCount > 0)
+            for (int j = i + 1; j < physicsBodiesCount; j++)
             {
-                // Create a new manifold with same information as previously solved manifold and add it to the manifolds pool last slot
-                PhysicsManifold newManifold = CreatePhysicsManifold(A, B);
-                newManifold->penetration = manifold->penetration;
-                newManifold->normal = manifold->normal;
-                newManifold->contacts[0] = manifold->contacts[0];
-                newManifold->contacts[1] = manifold->contacts[1];
-                newManifold->contactsCount = manifold->contactsCount;
-                newManifold->e = manifold->e;
-                newManifold->df = manifold->df;
-                newManifold->sf = manifold->sf;
+                PhysicsBody B = bodies[j];
+                
+                if (B != NULL)
+                {
+                    if ((A->inverseMass == 0) && (B->inverseMass == 0)) continue;
+
+                    PhysicsManifold manifold = CreatePhysicsManifold(A, B);
+                    SolvePhysicsManifold(manifold);
+
+                    if (manifold->contactsCount > 0)
+                    {
+                        // Create a new manifold with same information as previously solved manifold and add it to the manifolds pool last slot
+                        PhysicsManifold newManifold = CreatePhysicsManifold(A, B);
+                        newManifold->penetration = manifold->penetration;
+                        newManifold->normal = manifold->normal;
+                        newManifold->contacts[0] = manifold->contacts[0];
+                        newManifold->contacts[1] = manifold->contacts[1];
+                        newManifold->contactsCount = manifold->contactsCount;
+                        newManifold->e = manifold->e;
+                        newManifold->df = manifold->df;
+                        newManifold->sf = manifold->sf;
+                    }
+                }
             }
         }
     }
 
     // Integrate forces to physics bodies
-    for (int i = 0; i < physicsBodiesCount; i++) IntegratePhysicsForces(bodies[i]);
+    for (int i = 0; i < physicsBodiesCount; i++)
+    {
+        PhysicsBody body = bodies[i];
+        if (body != NULL) IntegratePhysicsForces(body);
+    }
 
     // Initialize physics manifolds to solve collisions
-    for (int i = 0; i < physicsManifoldsCount; i++) InitializePhysicsManifolds(contacts[i]);
+    for (int i = 0; i < physicsManifoldsCount; i++)
+    {
+        PhysicsManifold manifold = contacts[i];
+        if (manifold != NULL) InitializePhysicsManifolds(manifold);
+    }
 
     // Integrate physics collisions impulses to solve collisions
     for (int i = 0; i < COLLISION_ITERATIONS; i++)
     {
-        for (int j = 0; j < physicsManifoldsCount; j++) IntegratePhysicsImpulses(contacts[j]);
+        for (int j = 0; j < physicsManifoldsCount; j++)
+        {
+            PhysicsManifold manifold = contacts[i];
+            if (manifold != NULL) IntegratePhysicsImpulses(manifold);
+        }
     }
 
     // Integrate velocity to physics bodies
-    for (int i = 0; i < physicsBodiesCount; i++) IntegratePhysicsVelocity(bodies[i]);
+    for (int i = 0; i < physicsBodiesCount; i++)
+    {
+        PhysicsBody body = bodies[i];
+        if (body != NULL) IntegratePhysicsVelocity(body);
+    }
 
     // Correct physics bodies positions based on manifolds collision information
-    for (int i = 0; i < physicsManifoldsCount; i++) CorrectPhysicsPositions(contacts[i]);
+    for (int i = 0; i < physicsManifoldsCount; i++)
+    {
+        PhysicsManifold manifold = contacts[i];
+        if (manifold != NULL) CorrectPhysicsPositions(manifold);
+    }
 
     // Clear physics bodies forces
     for (int i = 0; i < physicsBodiesCount; i++)
     {
-        bodies[i]->force = (Vector2){ 0 };
-        bodies[i]->torque = 0;
+        PhysicsBody body = bodies[i];
+        if (body != NULL)
+        {
+            body->force = (Vector2){ 0 };
+            body->torque = 0;
+        }
     }
 }
 
@@ -1119,8 +1247,8 @@ static void SolvePhysicsManifold(PhysicsManifold manifold)
         {
             switch (manifold->bodyB->shape.type)
             {
-                case PHYSICS_CIRCLE: SolvePhysicsCircleToCircle(manifold); break;
-                case PHYSICS_POLYGON: SolvePhysicsCircleToPolygon(manifold); break;
+                case PHYSICS_CIRCLE: SolveCircleToCircle(manifold); break;
+                case PHYSICS_POLYGON: SolveCircleToPolygon(manifold); break;
                 default: break;
             }
         } break;
@@ -1128,8 +1256,8 @@ static void SolvePhysicsManifold(PhysicsManifold manifold)
         {
             switch (manifold->bodyB->shape.type)
             {
-                case PHYSICS_CIRCLE: SolvePhysicsPolygonToCircle(manifold); break;
-                case PHYSICS_POLYGON: SolvePhysicsPolygonToPolygon(manifold); break;
+                case PHYSICS_CIRCLE: SolvePolygonToCircle(manifold); break;
+                case PHYSICS_POLYGON: SolvePolygonToPolygon(manifold); break;
                 default: break;
             }
         } break;
@@ -1138,7 +1266,7 @@ static void SolvePhysicsManifold(PhysicsManifold manifold)
 }
 
 // Solves collision between two circle shape physics bodies
-static void SolvePhysicsCircleToCircle(PhysicsManifold manifold)
+static void SolveCircleToCircle(PhysicsManifold manifold)
 {
     PhysicsBody A = manifold->bodyA;
     PhysicsBody B = manifold->bodyB;
@@ -1156,7 +1284,7 @@ static void SolvePhysicsCircleToCircle(PhysicsManifold manifold)
         return;
     }
 
-    float distance = sqrt(dist_sqr);
+    float distance = sqrtf(dist_sqr);
     manifold->contactsCount = 1;
 
     if (distance == 0)
@@ -1174,7 +1302,7 @@ static void SolvePhysicsCircleToCircle(PhysicsManifold manifold)
 }
 
 // Solves collision between a circle to a polygon shape physics bodies
-static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold)
+static void SolveCircleToPolygon(PhysicsManifold manifold)
 {
     PhysicsBody A = manifold->bodyA;
     PhysicsBody B = manifold->bodyB;
@@ -1186,7 +1314,7 @@ static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold)
     center = Mat2MultiplyVector2(Mat2Transpose(B->shape.vertexData.transform), Vector2Subtract(center, B->position));
 
     // Find edge with minimum penetration
-    // It is the same concept as using support points in SolvePhysicsPolygonToPolygon
+    // It is the same concept as using support points in SolvePolygonToPolygon
     float separation = -MATH_FLT_MAX;
     int faceNormal = 0;
     PolygonData vertexData = B->shape.vertexData;
@@ -1270,21 +1398,21 @@ static void SolvePhysicsCircleToPolygon(PhysicsManifold manifold)
 }
 
 // Solves collision between a polygon to a circle shape physics bodies
-static void SolvePhysicsPolygonToCircle(PhysicsManifold manifold)
+static void SolvePolygonToCircle(PhysicsManifold manifold)
 {
     PhysicsBody A = manifold->bodyA;
     PhysicsBody B = manifold->bodyB;
 
     manifold->bodyA = B;
     manifold->bodyB = A;
-    SolvePhysicsCircleToPolygon(manifold);
+    SolveCircleToPolygon(manifold);
 
     manifold->normal.x *= -1;
     manifold->normal.y *= -1;
 }
 
 // Solves collision between two polygons shape physics bodies
-static void SolvePhysicsPolygonToPolygon(PhysicsManifold manifold)
+static void SolvePolygonToPolygon(PhysicsManifold manifold)
 {
     PhysicsShape A = manifold->bodyA->shape;
     PhysicsShape B = manifold->bodyB->shape;
@@ -1406,8 +1534,8 @@ static void InitializePhysicsManifolds(PhysicsManifold manifold)
     manifold->e = min(A->restitution, B->restitution);
 
     // Calculate static and dynamic friction
-    manifold->sf = sqrt(A->staticFriction*B->staticFriction);
-    manifold->df = sqrt(A->dynamicFriction*B->dynamicFriction);
+    manifold->sf = sqrtf(A->staticFriction*B->staticFriction);
+    manifold->df = sqrtf(A->dynamicFriction*B->dynamicFriction);
 
     for (int i = 0; i < 2; i++)
     {
@@ -1704,6 +1832,8 @@ static bool BiasGreaterThan(float a, float b)
 // Initializes hi-resolution timer
 static void InitTimer()
 {
+    srand(time(NULL));              // Initialize random seed
+
     #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
         struct timespec now;
         if (clock_gettime(CLOCK_MONOTONIC, &now) == 0) baseTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;
@@ -1735,6 +1865,19 @@ static double GetCurrentTime(void)
     #endif
 
     return time;
+}
+
+// Returns a random number between min and max (both included)
+static int GetRandomNumber(int min, int max)
+{
+    if (min > max)
+    {
+        int tmp = max;
+        max = min;
+        min = tmp;
+    }
+
+    return (rand()%(abs(max - min) + 1) + min);
 }
 
 // Clamp a value in a range
@@ -1774,7 +1917,7 @@ static void MathNormalize(Vector2 *v)
     float length, ilength;
 
     Vector2 vector = *v;
-    length = sqrt(vector.x*vector.x + vector.y*vector.y);
+    length = sqrtf(vector.x*vector.x + vector.y*vector.y);
 
     if (length == 0) length = 1.0f;
 
@@ -1799,8 +1942,8 @@ static inline Vector2 Vector2Subtract(Vector2 a, Vector2 b)
 // Creates a matrix 2x2 from a given radians value
 static inline Mat2 Mat2Radians(float radians)
 {
-    float c = cos(radians);
-    float s = sin(radians);
+    float c = cosf(radians);
+    float s = sinf(radians);
 
     return (Mat2){ c, -s, s, c };
 }
@@ -1814,8 +1957,8 @@ static inline Mat2 CreateMat2(float a, float b, float c, float d)
 // Set values from radians to a created matrix 2x2
 static void Mat2Set(Mat2 *matrix, float radians)
 {
-    float c = cos(radians);
-    float s = sin(radians);
+    float c = cosf(radians);
+    float s = sinf(radians);
 
     matrix->m00 = c;
     matrix->m01 = -s;

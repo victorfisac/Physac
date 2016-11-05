@@ -25,16 +25,15 @@ int main()
     InitWindow(screenWidth, screenHeight, "Physac [raylib] - demo");
     SetTargetFPS(60);
 
-    bool closedPhysics = false;     // Used for manual physics closing and reinitialization
-
     // Physac logo drawing position
     int logoX = screenWidth - MeasureText("Physac", 30) - 10;
     int logoY = 15;
 
     // Initialize physics and default physics bodies
-    InitPhysics((Vector2){ 0, 0 });
+    InitPhysics();
+    SetPhysicsGravity(0, 0);
 
-    PhysicsBody A = CreatePhysicsBodyPolygon(GetRandomValue(3, PHYSAC_MAX_VERTICES), GetRandomValue(80, 200), (Vector2){ screenWidth/2, screenHeight/2 }, 10);
+    PhysicsBody A = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, PHYSAC_MAX_VERTICES), 10);
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -42,20 +41,12 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (!physicsThreadEnabled && closedPhysics)   // Wait for physics thread end to reinitialize it again to avoid exceptions
-        {
-            InitPhysics((Vector2){ 0, 0 });
-
-            // Create obstacle circle physics body
-            A = CreatePhysicsBodyPolygon(GetRandomValue(3, PHYSAC_MAX_VERTICES), GetRandomValue(80, 200), (Vector2){ screenWidth/2, screenHeight/2 }, 10);
-
-            closedPhysics = false;
-        }
-
         if (IsKeyPressed('R'))  // Reset physics input
         {
-            ClosePhysics();          
-            closedPhysics = true;
+            ResetPhysics();
+
+            // Create obstacle circle physics body
+            A = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, PHYSAC_MAX_VERTICES), 10);
         }
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
@@ -70,7 +61,25 @@ int main()
 
             ClearBackground(BLACK);
 
-            DrawPhysicsBodies();    // Draws all created physics bodies shapes
+            // Draw created physics bodies
+            int bodiesCount = GetPhysicsBodiesCount();
+            for (int i = 0; i < bodiesCount; i++)
+            {
+                PhysicsBody body = GetPhysicsBody(i);
+
+                int vertexCount = GetPhysicsShapeVerticesCount(i);
+                for (int j = 0; j < vertexCount; j++)
+                {
+                    // Get physics bodies shape vertices to draw lines
+                    // Note: GetPhysicsShapeVertex() already calculates rotation transformations
+                    Vector2 vertexA = GetPhysicsShapeVertex(body, j);
+
+                    int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
+                    Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
+                    
+                    DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
+                }
+            }
             
             DrawText("Left mouse button in polygon area to shatter body\nPress 'R' to reset example", 10, 10, 10, WHITE);
 
