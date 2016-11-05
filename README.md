@@ -12,7 +12,7 @@ _Note: The example code uses raylib programming library to create the program wi
 Physac API
 -----
 
-The PhysicsBody struct contains all dynamics information and collision shape. It has the following structure:
+The PhysicsBody struct contains all dynamics information and collision shape. The user should use the following structure components:
 ```c
 typedef struct *PhysicsBody {
     unsigned int id;
@@ -23,10 +23,6 @@ typedef struct *PhysicsBody {
     float angularVelocity;          // Current angular velocity applied to orient
     float torque;                   // Current angular force (reset to 0 every step)
     float orient;                   // Rotation in radians
-    float inertia;                  // Moment of inertia
-    float inverseInertia;           // Inverse value of inertia
-    float mass;                     // Physics body mass
-    float inverseMass;              // Inverse value of mass
     float staticFriction;           // Friction when the body has not movement (0 to 1)
     float dynamicFriction;          // Friction when the body has movement (0 to 1)
     float restitution;              // Restitution coefficient of the body (0 to 1)
@@ -48,19 +44,25 @@ The Physac API functions availables for the user are the following:
 
 ```c
 // Initializes physics values, pointers and creates physics loop thread
-void InitPhysics(Vector2 gravity);
+void InitPhysics(void);
+
+// Returns true if physics thread is currently enabled
+bool IsPhysicsEnabled(void);
+
+// Sets physics global gravity force
+void SetPhysicsGravity(float x, float y);
 
 // Creates a new circle physics body with generic parameters
 PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);
 
 // Creates a new rectangle physics body with generic parameters
-PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, Vector2 min, Vector2 max, float density);
+PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float height, float density);
 
 // Creates a new polygon physics body with generic parameters
-PhysicsBody CreatePhysicsBodyPolygon(int vertex, float distance, Vector2 pos, float density);
+PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int sides, float density);
 
 // Adds a force to a physics body
-void PhysicsAddForce(PhysicsBody body, Vector2 f);
+void PhysicsAddForce(PhysicsBody body, Vector2 force);
 
 // Adds a angular force to a physics body
 void PhysicsAddTorque(PhysicsBody body, float amount);
@@ -68,14 +70,26 @@ void PhysicsAddTorque(PhysicsBody body, float amount);
 // Shatters a polygon shape physics body to little physics bodies with explosion force
 void PhysicsShatter(PhysicsBody body, Vector2 position, float force);
 
-// Draws all created physics bodies shapes
-void DrawPhysicsBodies(void);
+// Returns the current amount of created physics bodies
+int GetPhysicsBodiesCount(void);
 
-// Draws all calculated physics contacts points and its normals
-void DrawPhysicsContacts(void);
+// Returns a physics body of the bodies pool at a specific index
+PhysicsBody GetPhysicsBody(int index);
+
+// Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON)
+int GetPhysicsShapeType(int index);
+
+// Returns the amount of vertices of a physics body shape
+int GetPhysicsShapeVerticesCount(int index);
+
+// Returns transformed position of a body shape (body position + vertex transformed position)
+Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex);
 
 // Unitializes and destroy a physics body
 void DestroyPhysicsBody(PhysicsBody body);
+
+// Destroys created physics bodies and manifolds and resets global values
+void ResetPhysics(void);
 
 // Unitializes physics pointers and closes physics loop thread
 void ClosePhysics(void);
@@ -89,6 +103,6 @@ The current main dependency of Physac is [raylib](http://www.raylib.com). This v
 
 Besides, Physac uses the following C libraries:
 
-   *  stdlib.h - Memory allocation [malloc(), free()].
+   *  stdlib.h - Memory allocation [malloc(), free(), srand(), rand()].
    *  stdio.h  - Message logging (only if PHYSAC_DEBUG is defined) [printf()].
-   *  math.h   - Math operations functions [cos(), sin(), fabs(), sqrt()].
+   *  math.h   - Math operations functions [cos(), sin(), fabs(), sqrtf()].
