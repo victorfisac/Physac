@@ -199,7 +199,6 @@ PHYSACDEF PhysicsBody GetPhysicsBody(int index);                                
 PHYSACDEF int GetPhysicsShapeType(int index);                                           // Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON)
 PHYSACDEF int GetPhysicsShapeVerticesCount(int index);                                  // Returns the amount of vertices of a physics body shape
 PHYSACDEF Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex);                  // Returns transformed position of a body shape (body position + vertex transformed position)
-PHYSACDEF void DrawPhysicsBodies(void);                                                 // Draws all created physics bodies shapes
 PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                                    // Unitializes and destroy a physics body
 PHYSACDEF void ResetPhysics(void);                                                      // Destroys created physics bodies and manifolds and resets global values
 PHYSACDEF void ClosePhysics(void);                                                      // Unitializes physics pointers and closes physics loop thread
