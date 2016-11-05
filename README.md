@@ -40,6 +40,13 @@ The header contains a few customizable define values. I set the values that give
 #define     PENETRATION_CORRECTION          0.4f
 ```
 
+Physac contains defines for memory management functions (malloc, free) to bring the user the opportunity to implement its own memory functions:
+
+```c
+#define     PHYSAC_MALLOC(size)             malloc(size)
+#define     PHYSAC_FREE(ptr)                free(ptr)
+```
+
 The Physac API functions availables for the user are the following:
 
 ```c
@@ -99,10 +106,12 @@ _Note: InitPhysics() needs to be called at program start and ClosePhysics() befo
 Dependencies
 -----
 
-The current main dependency of Physac is [raylib](http://www.raylib.com). This videogames programming library is used to handle inputs, window management and graphics drawing (using OpenGL API). I would like to remove this dependency soon and implement my own functions to make Physac more independent.
-
-Besides, Physac uses the following C libraries:
+Physac uses the following C libraries for memory management, math operations and some debug features:
 
    *  stdlib.h - Memory allocation [malloc(), free(), srand(), rand()].
    *  stdio.h  - Message logging (only if PHYSAC_DEBUG is defined) [printf()].
    *  math.h   - Math operations functions [cos(), sin(), fabs(), sqrtf()].
+
+**It is independent to any graphics engine** and prepared to use any graphics API and use the vertices information (look at examples Drawing logic) to draw lines or shapes in screen. For example, this vertices information can be use in OpenGL API glVertex2f().
+
+By the way, I use [raylib](http://www.raylib.com) to create the examples. This videogames programming library is used to handle inputs, window management and graphics drawing (using OpenGL API).
