@@ -39,7 +39,7 @@ int main()
     A->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
 
     // Create obstacle circle physics body
-    PhysicsBody B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
+    PhysicsBody B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
     B->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
     //--------------------------------------------------------------------------------------
 
@@ -55,8 +55,8 @@ int main()
             if (body->position.y > screenHeight*2) DestroyPhysicsBody(body);
         }
 
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, PHYSAC_MAX_VERTICES), 10);
-        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), 2, GetRandomValue(10, 45));
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, 8), 10);
+        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), GetRandomValue(10, 45), 10);
 
         if (IsKeyPressed('R'))
         {
@@ -65,7 +65,7 @@ int main()
             A = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
             A->enabled = false;
 
-            B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 2, 45);
+            B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
             B->enabled = false;
         }
         else if (IsKeyPressed('P')) debug = !debug;     // Debug state switch input

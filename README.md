@@ -60,7 +60,7 @@ bool IsPhysicsEnabled(void);
 void SetPhysicsGravity(float x, float y);
 
 // Creates a new circle physics body with generic parameters
-PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);
+PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float radius, float density);
 
 // Creates a new rectangle physics body with generic parameters
 PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float height, float density);

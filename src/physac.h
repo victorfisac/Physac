@@ -80,9 +80,9 @@
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define     MAX_PHYSICS_BODIES              2048
+#define     MAX_PHYSICS_BODIES              64
 #define     MAX_PHYSICS_MANIFOLDS           2048
-#define     PHYSAC_MAX_VERTICES             8
+#define     PHYSAC_MAX_VERTICES             24
 #define     PHYSAC_CIRCLE_VERTICES          24
 
 #define     DESIRED_DELTATIME               1.0/60.0
@@ -188,7 +188,7 @@ extern "C" {            // Prevents name mangling of functions
 PHYSACDEF void InitPhysics(void);                                                                           // Initializes physics values, pointers and creates physics loop thread
 PHYSACDEF bool IsPhysicsEnabled(void);                                                                      // Returns true if physics thread is currently enabled
 PHYSACDEF void SetPhysicsGravity(float x, float y);                                                         // Sets physics global gravity force
-PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius);                    // Creates a new circle physics body with generic parameters
+PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float radius, float density);                    // Creates a new circle physics body with generic parameters
 PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float height, float density);    // Creates a new rectangle physics body with generic parameters
 PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int sides, float density);        // Creates a new polygon physics body with generic parameters
 PHYSACDEF void PhysicsAddForce(PhysicsBody body, Vector2 force);                        // Adds a force to a physics body
@@ -307,6 +307,7 @@ static Vector2 MathCross(float a, Vector2 v);                                   
 static float MathCrossVector2(Vector2 a, Vector2 b);                                // Returns the cross product of two vectors
 static float MathLenSqr(Vector2 v);                                                 // Returns the len square root of a vector
 static float MathDot(Vector2 a, Vector2 b);                                         // Returns the dot product of two vectors
+static inline float DistSqr(Vector2 a, Vector2 b);                                  // Returns the square root of distance between two vectors
 static void MathNormalize(Vector2 *v);                                              // Returns the normalized values of a vector
 static Vector2 Vector2Add(Vector2 a, Vector2 b);                                    // Returns the sum of two given vectors
 static Vector2 Vector2Subtract(Vector2 a, Vector2 b);                               // Returns the subtract of two given vectors
@@ -350,9 +351,12 @@ PHYSACDEF void SetPhysicsGravity(float x, float y)
 }
 
 // Creates a new circle physics body with generic parameters
-PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float radius)
+PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float radius, float density)
 {
-    PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
+    PhysicsBody newBody = CreatePhysicsBodyPolygon(pos, radius, PHYSAC_CIRCLE_VERTICES, density);
+    return newBody;
+
+    /*PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
     usedMemory += sizeof(PhysicsBodyData);
 
     int newId = -1;
@@ -413,7 +417,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float density, float 
         else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
     #endif
 
-    return newBody;
+    return newBody;*/
 }
 
 // Creates a new rectangle physics body with generic parameters
@@ -1120,7 +1124,9 @@ static void PhysicsStep(void)
                 {
                     if ((A->inverseMass == 0) && (B->inverseMass == 0)) continue;
 
-                    PhysicsManifold manifold = CreatePhysicsManifold(A, B);
+                    PhysicsManifold manifold;
+                    if (A->shape.type == PHYSICS_POLYGON && B->shape.type == PHYSICS_CIRCLE) manifold = CreatePhysicsManifold(B, A);
+                    else manifold = CreatePhysicsManifold(A, B);
                     SolvePhysicsManifold(manifold);
 
                     if (manifold->contactsCount > 0)
@@ -1367,7 +1373,7 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
     int faceNormal = 0;
     PolygonData vertexData = B->shape.vertexData;
 
-    for (int i = 0; i < B->shape.vertexData.vertexCount; i++)
+    for (int i = 0; i < vertexData.vertexCount; i++)
     {
         float s = MathDot(vertexData.normals[i], Vector2Subtract(center, vertexData.vertices[i]));
         
@@ -1402,11 +1408,8 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
     manifold->penetration = A->shape.radius - separation;
 
     if (dot1 <= 0) // Closest to v1
-    {
-        Vector2 c = Vector2Subtract(center, v1);
-        float distSqr = MathDot(c, c);
-        
-        if (distSqr > A->shape.radius*A->shape.radius) return;
+    {        
+        if (DistSqr(center, v1) > A->shape.radius*A->shape.radius) return;
         
         manifold->contactsCount = 1;
         Vector2 normal = Vector2Subtract(v1, center);
@@ -1419,10 +1422,7 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
     }
     else if (dot2 <= 0) // Closest to v2
     {
-        Vector2 c = { center.x - v2.x, center.y - v2.y };
-        float distSqr = MathDot(c, c);
-        
-        if (distSqr > A->shape.radius*A->shape.radius) return;
+        if (DistSqr(center, v2) > A->shape.radius*A->shape.radius) return;
         
         manifold->contactsCount = 1;
         Vector2 normal = Vector2Subtract(v2, center);
@@ -1968,6 +1968,13 @@ static inline float MathLenSqr(Vector2 v)
 static inline float MathDot(Vector2 a, Vector2 b)
 {
     return (a.x*b.x + a.y*b.y);
+}
+
+// Returns the square root of distance between two vectors
+static inline float DistSqr(Vector2 a, Vector2 b)
+{
+    Vector2 c = Vector2Subtract(a, b);
+    return MathDot(c, c);
 }
 
 // Returns the normalized values of a vector
