@@ -12,7 +12,7 @@
 #include "raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-#include "physac.h" 
+#include "..\src\physac.h" 
 
 int main()
 {
@@ -51,7 +51,11 @@ int main()
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            for (int i = physicsBodiesCount; i >= 0; i--) PhysicsShatter(bodies[i], GetMousePosition(), 1000000);
+            for (int i = GetPhysicsBodiesCount(); i >= 0; i--)
+            {
+                PhysicsBody body = bodies[i];
+                if (body != NULL) PhysicsShatter(body, GetMousePosition(), 10/body->inverseMass);
+            }
         }
         //----------------------------------------------------------------------------------
 
