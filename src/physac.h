@@ -399,7 +399,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float radius, float d
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         newBody->staticFriction = 0.4f;
         newBody->dynamicFriction = 0.2f;
-        newBody->restitution = 0.2;
+        newBody->restitution = 0.2f;
         newBody->useGravity = true;
         newBody->shape.type = PHYSICS_CIRCLE;
         newBody->shape.body = newBody;
@@ -508,7 +508,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         newBody->staticFriction = 0.4f;
         newBody->dynamicFriction = 0.2f;
-        newBody->restitution = 0.2;
+        newBody->restitution = 0.2f;
         newBody->useGravity = true;
 
         // Add new body to bodies pointers array and update bodies count
@@ -614,7 +614,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int si
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         newBody->staticFriction = 0.4f;
         newBody->dynamicFriction = 0.2f;
-        newBody->restitution = 0.2;
+        newBody->restitution = 0.2f;
         newBody->useGravity = true;
 
         // Add new body to bodies pointers array and update bodies count
@@ -1579,7 +1579,7 @@ static void InitializePhysicsManifolds(PhysicsManifold manifold)
     PhysicsBody B = manifold->bodyB;
 
     // Calculate average restitution
-    manifold->e = min(A->restitution, B->restitution);
+    manifold->e = (A->restitution + B->restitution)/2;
 
     // Calculate static and dynamic friction
     manifold->sf = sqrtf(A->staticFriction*B->staticFriction);
