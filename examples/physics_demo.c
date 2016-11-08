@@ -1,6 +1,6 @@
 /*******************************************************************************************
 *
-*   Physac - Hello World
+*   Physac - Physics demo
 *
 *   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
 *   The file pthreadGC2.dll is required to run the program; you can find it in 'src\external'
@@ -22,10 +22,8 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - demo");
+    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics demo");
     SetTargetFPS(60);
-
-    bool debug = false;
 
     // Physac logo drawing position
     int logoX = screenWidth - MeasureText("Physac", 30) - 10;
@@ -68,7 +66,6 @@ int main()
             B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
             B->enabled = false;
         }
-        else if (IsKeyPressed('P')) debug = !debug;     // Debug state switch input
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -101,7 +98,7 @@ int main()
 
             DrawText("Left mouse button to create a polygon", 10, 10, 10, WHITE);
             DrawText("Right mouse button to create a circle", 10, 25, 10, WHITE);
-            DrawText("Press 'P' to switch debug state\nPress 'R' to reset example", 10, 40, 10, WHITE);
+            DrawText("Press 'R' to reset example", 10, 40, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);

@@ -1,6 +1,6 @@
 /*******************************************************************************************
 *
-*   Physac - Hello World
+*   Physac - Body shatter
 *
 *   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
 *   The file pthreadGC2.dll is required to run the program; you can find it in 'src\external'
@@ -22,7 +22,7 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - demo");
+    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Body shatter");
     SetTargetFPS(60);
 
     // Physac logo drawing position
@@ -84,7 +84,7 @@ int main()
                     DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
                 }
             }
-            
+
             DrawText("Left mouse button in polygon area to shatter body\nPress 'R' to reset example", 10, 10, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
