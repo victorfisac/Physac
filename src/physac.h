@@ -141,7 +141,7 @@ typedef struct PhysicsShape {
 } PhysicsShape;
 
 typedef struct PhysicsBodyData {
-    unsigned int id;
+    unsigned int id;                // Reference unique identifier
     bool enabled;                   // Enabled dynamics state (collisions are calculated anyway)
     Vector2 position;               // Physics body shape pivot
     Vector2 velocity;               // Current linear velocity applied to position
@@ -161,16 +161,16 @@ typedef struct PhysicsBodyData {
 } PhysicsBodyData;
 
 typedef struct PhysicsManifoldData {
-    int id;
+    unsigned int id;                // Reference unique identifier
     PhysicsBody bodyA;              // Manifold first physics body reference
     PhysicsBody bodyB;              // Manifold second physics body reference
     float penetration;              // Depth of penetration from collision
     Vector2 normal;                 // Normal direction vector from 'a' to 'b'
     Vector2 contacts[2];            // Points of contact during collision
     unsigned int contactsCount;     // Current collision number of contacts
-    float e;                        // Mixed restitution during collision
-    float df;                       // Mixed dynamic friction during collision
-    float sf;                       // Mixed static friction during collision
+    float restitution;              // Mixed restitution during collision
+    float dynamicFriction;          // Mixed dynamic friction during collision
+    float staticFriction;           // Mixed static friction during collision
 } PhysicsManifoldData, *PhysicsManifold;
 
 #if defined(__cplusplus)
@@ -294,31 +294,33 @@ static void InitializePhysicsManifolds(PhysicsManifold manifold);               
 static void IntegratePhysicsImpulses(PhysicsManifold manifold);                     // Integrates physics collisions impulses to solve collisions
 static void IntegratePhysicsVelocity(PhysicsBody body);                             // Integrates physics velocity into position and forces
 static void CorrectPhysicsPositions(PhysicsManifold manifold);                      // Corrects physics bodies positions based on manifolds collision information
-static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape A, PhysicsShape B);      // Finds polygon shapes axis least penetration
+static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape shapeA, PhysicsShape shapeB);            // Finds polygon shapes axis least penetration
 static void FindIncidentFace(Vector2 *v0, Vector2 *v1, PhysicsShape ref, PhysicsShape inc, int index);      // Finds two polygon shapes incident face
-static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB);                // Calculates clipping based on a normal and two faces
-static bool BiasGreaterThan(float a, float b);                                      // Check if values are between bias range
-static Vector2 TriangleBarycenter(Vector2 a, Vector2 b, Vector2 c);                 // Returns the barycenter of a triangle given by 3 points
-static void InitTimer();                                                            // Initializes hi-resolution timer
+static int Clip(Vector2 normal, float clip, Vector2 *faceA, Vector2 *faceB);                                // Calculates clipping based on a normal and two faces
+static bool BiasGreaterThan(float valueA, float valueB);                            // Check if values are between bias range
+static Vector2 TriangleBarycenter(Vector2 v1, Vector2 v2, Vector2 v3);              // Returns the barycenter of a triangle given by 3 points
+static void InitTimer(void);                                                        // Initializes hi-resolution timer
 static double GetCurrentTime(void);                                                 // Get current time in milliseconds
 static int GetRandomNumber(int min, int max);                                       // Returns a random number between min and max (both included)
+
 static void MathClamp(double *value, double min, double max);                       // Clamp a value in a range
-static Vector2 MathCross(float a, Vector2 v);                                       // Returns the cross product of a vector and a value
-static float MathCrossVector2(Vector2 a, Vector2 b);                                // Returns the cross product of two vectors
-static float MathLenSqr(Vector2 v);                                                 // Returns the len square root of a vector
-static float MathDot(Vector2 a, Vector2 b);                                         // Returns the dot product of two vectors
-static inline float DistSqr(Vector2 a, Vector2 b);                                  // Returns the square root of distance between two vectors
-static void MathNormalize(Vector2 *v);                                              // Returns the normalized values of a vector
-static Vector2 Vector2Add(Vector2 a, Vector2 b);                                    // Returns the sum of two given vectors
-static Vector2 Vector2Subtract(Vector2 a, Vector2 b);                               // Returns the subtract of two given vectors
+static Vector2 MathCross(float value, Vector2 vector);                              // Returns the cross product of a vector and a value
+static float MathCrossVector2(Vector2 v1, Vector2 v2);                              // Returns the cross product of two vectors
+static float MathLenSqr(Vector2 vector);                                            // Returns the len square root of a vector
+static float MathDot(Vector2 v1, Vector2 v2);                                       // Returns the dot product of two vectors
+static inline float DistSqr(Vector2 v1, Vector2 v2);                                // Returns the square root of distance between two vectors
+static void MathNormalize(Vector2 *vector);                                         // Returns the normalized values of a vector
+static Vector2 Vector2Add(Vector2 v1, Vector2 v2);                                  // Returns the sum of two given vectors
+static Vector2 Vector2Subtract(Vector2 v1, Vector2 v2);                             // Returns the subtract of two given vectors
+
 static Mat2 Mat2Radians(float radians);                                             // Creates a matrix 2x2 from a given radians value
-static Mat2 CreateMat2(float a, float b, float c, float d);                         // Creates a matrix 2x2 from specific values
+static Mat2 CreateMat2(float valueA, float valueB, float valueC, float valueD);     // Creates a matrix 2x2 from specific values
 static void Mat2Set(Mat2 *matrix, float radians);                                   // Set values from radians to a created matrix 2x2
 static void Mat2Abs(Mat2 *matrix, float radians);                                   // Converts to absolute value every matrix values
 static Vector2 Mat2AxisX(Mat2 matrix);                                              // Returns m00 and m10 as a Vector2 struct of a matrix 2x2
 static Vector2 Mat2AxisY(Mat2 matrix);                                              // Returns m01 and m11 as a Vector2 struct of a matrix 2x2
-static Mat2 Mat2Transpose(Mat2 m);                                                  // Returns the transpose of a given matrix 2x2
-static Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v);                              // Multiplies a vector by a matrix 2x2
+static Mat2 Mat2Transpose(Mat2 matrix);                                             // Returns the transpose of a given matrix 2x2
+static Vector2 Mat2MultiplyVector2(Mat2 matrix, Vector2 vector);                    // Multiplies a vector by a matrix 2x2
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -474,8 +476,8 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float
         {
             // Triangle vertices, third vertex implied as (0, 0)
             Vector2 p1 = newBody->shape.vertexData.vertices[i];
-            int ii = (((i + 1) < newBody->shape.vertexData.vertexCount) ? (i + 1) : 0);
-            Vector2 p2 = newBody->shape.vertexData.vertices[ii];
+            int nextIndex = (((i + 1) < newBody->shape.vertexData.vertexCount) ? (i + 1) : 0);
+            Vector2 p2 = newBody->shape.vertexData.vertices[nextIndex];
 
             float D = MathCrossVector2(p1, p2);
             float triangleArea = D/2;
@@ -574,27 +576,27 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int si
         Vector2 center = { 0 };
         float area = 0;
         float inertia = 0;
-        const float k = 1.0f/3.0f;
+        const float alpha = 1.0f/3.0f;
 
         for (int i = 0; i < newBody->shape.vertexData.vertexCount; i++)
         {
             // Triangle vertices, third vertex implied as (0, 0)
-            Vector2 p1 = newBody->shape.vertexData.vertices[i];
-            int ii = (((i + 1) < newBody->shape.vertexData.vertexCount) ? (i + 1) : 0);
-            Vector2 p2 = newBody->shape.vertexData.vertices[ii];
+            Vector2 position1 = newBody->shape.vertexData.vertices[i];
+            int nextIndex = (((i + 1) < newBody->shape.vertexData.vertexCount) ? (i + 1) : 0);
+            Vector2 position2 = newBody->shape.vertexData.vertices[nextIndex];
 
-            float D = MathCrossVector2(p1, p2);
-            float triangleArea = D/2;
+            float cross = MathCrossVector2(position1, position2);
+            float triangleArea = cross/2;
 
             area += triangleArea;
 
             // Use area to weight the centroid average, not just vertex position
-            center.x += triangleArea*k*(p1.x + p2.x);
-            center.y += triangleArea*k*(p1.y + p2.y);
+            center.x += triangleArea*alpha*(position1.x + position2.x);
+            center.y += triangleArea*alpha*(position1.y + position2.y);
 
-            float intx2 = p1.x*p1.x + p2.x*p1.x + p2.x*p2.x;
-            float inty2 = p1.y*p1.y + p2.y*p1.y + p2.y*p2.y;
-            inertia += (0.25f*k*D)*(intx2 + inty2);
+            float intx2 = position1.x*position1.x + position2.x*position1.x + position2.x*position2.x;
+            float inty2 = position1.y*position1.y + position2.y*position1.y + position2.y*position2.y;
+            inertia += (0.25f*alpha*cross)*(intx2 + inty2);
         }
 
         center.x *= 1.0f/area;
@@ -658,8 +660,8 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
             {
                 Vector2 positionA = body->position;
                 Vector2 positionB = Mat2MultiplyVector2(vertexData.transform, Vector2Add(body->position, vertexData.vertices[i]));
-                int ii = (((i + 1) < vertexData.vertexCount) ? (i + 1) : 0);
-                Vector2 positionC = Mat2MultiplyVector2(vertexData.transform, Vector2Add(body->position, vertexData.vertices[ii]));
+                int nextIndex = (((i + 1) < vertexData.vertexCount) ? (i + 1) : 0);
+                Vector2 positionC = Mat2MultiplyVector2(vertexData.transform, Vector2Add(body->position, vertexData.vertices[nextIndex]));
 
                 // Check collision between each triangle
                 float alpha = ((positionB.y - positionC.y)*(position.x - positionC.x) + (positionC.x - positionB.x)*(position.y - positionC.y))/
@@ -690,8 +692,8 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
 
                 for (int i = 0; i < count; i++)
                 {
-                    int ii = (((i + 1) < count) ? (i + 1) : 0);
-                    Vector2 center = TriangleBarycenter(vertices[i], vertices[ii], (Vector2){ 0, 0 });
+                    int nextIndex = (((i + 1) < count) ? (i + 1) : 0);
+                    Vector2 center = TriangleBarycenter(vertices[i], vertices[nextIndex], (Vector2){ 0, 0 });
                     center = Vector2Add(bodyPos, center);
                     Vector2 offset = Vector2Subtract(center, bodyPos);
 
@@ -702,7 +704,7 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
                     newData.transform = trans;
 
                     newData.vertices[0] = Vector2Subtract(vertices[i], offset);
-                    newData.vertices[1] = Vector2Subtract(vertices[ii], offset);
+                    newData.vertices[1] = Vector2Subtract(vertices[nextIndex], offset);
                     newData.vertices[2] = Vector2Subtract(position, center);
                     
                     // Separate vertices to avoid unnecessary physics collisions
@@ -716,8 +718,8 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
                     // Calculate polygon faces normals
                     for (int j = 0; j < newData.vertexCount; j++)
                     {
-                        int jj = (((j + 1) < newData.vertexCount) ? (j + 1) : 0);
-                        Vector2 face = Vector2Subtract(newData.vertices[jj], newData.vertices[j]);
+                        int nextVertex = (((j + 1) < newData.vertexCount) ? (j + 1) : 0);
+                        Vector2 face = Vector2Subtract(newData.vertices[nextVertex], newData.vertices[j]);
                         
                         newData.normals[j] = (Vector2){ face.y, -face.x };
                         MathNormalize(&newData.normals[j]);
@@ -736,8 +738,8 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
                     {
                         // Triangle vertices, third vertex implied as (0, 0)
                         Vector2 p1 = newBody->shape.vertexData.vertices[j];
-                        int jj = (((j + 1) < newBody->shape.vertexData.vertexCount) ? (j + 1) : 0);
-                        Vector2 p2 = newBody->shape.vertexData.vertices[jj];
+                        int nextVertex = (((j + 1) < newBody->shape.vertexData.vertexCount) ? (j + 1) : 0);
+                        Vector2 p2 = newBody->shape.vertexData.vertices[nextVertex];
 
                         float D = MathCrossVector2(p1, p2);
                         float triangleArea = D/2;
@@ -954,6 +956,7 @@ PHYSACDEF void ResetPhysics(void)
         {
             PHYSAC_FREE(body);
             body = NULL;
+            usedMemory -= sizeof(PhysicsBodyData);
         }
     }
     
@@ -968,10 +971,15 @@ PHYSACDEF void ResetPhysics(void)
         {
             PHYSAC_FREE(manifold);
             manifold = NULL;
+            usedMemory -= sizeof(PhysicsManifoldData);
         }
     }
 
     physicsManifoldsCount = 0;
+    
+    #if defined(PHYSAC_DEBUG)
+        printf("[PHYSAC] physics module reset successfully\n");
+    #endif
 }
 
 // Unitializes physics pointers and exits physics loop thread
@@ -1007,8 +1015,8 @@ static PolygonData CreateRandomPolygon(float radius, int sides)
     // Calculate polygon faces normals
     for (int i = 0; i < data.vertexCount; i++)
     {
-        int ii = (((i + 1) < sides) ? (i + 1) : 0);
-        Vector2 face = Vector2Subtract(data.vertices[ii], data.vertices[i]);
+        int nextIndex = (((i + 1) < sides) ? (i + 1) : 0);
+        Vector2 face = Vector2Subtract(data.vertices[nextIndex], data.vertices[i]);
         
         data.normals[i] = (Vector2){ face.y, -face.x };
         MathNormalize(&data.normals[i]);
@@ -1033,8 +1041,8 @@ static PolygonData CreateRectanglePolygon(Vector2 pos, Vector2 size)
     // Calculate polygon faces normals
     for (int i = 0; i < data.vertexCount; i++)
     {
-        int ii = (((i + 1) < data.vertexCount) ? (i + 1) : 0);
-        Vector2 face = Vector2Subtract(data.vertices[ii], data.vertices[i]);
+        int nextIndex = (((i + 1) < data.vertexCount) ? (i + 1) : 0);
+        Vector2 face = Vector2Subtract(data.vertices[nextIndex], data.vertices[i]);
         
         data.normals[i] = (Vector2){ face.y, -face.x };
         MathNormalize(&data.normals[i]);
@@ -1090,8 +1098,8 @@ static void *PhysicsLoop(void *arg)
     for (int i = physicsBodiesCount - 1; i >= 0; i--) DestroyPhysicsBody(bodies[i]);
 
     #if defined(PHYSAC_DEBUG)
-        if (physicsBodiesCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
-        else if (physicsManifoldsCount > 0 || usedMemory > 0) printf("[PHYSAC] physics module closed with %i still allocated manifolds [MEMORY: %i bytes]\n", physicsManifoldsCount, usedMemory);
+        if (physicsBodiesCount > 0 || usedMemory != 0) printf("[PHYSAC] physics module closed with %i still allocated bodies [MEMORY: %i bytes]\n", physicsBodiesCount, usedMemory);
+        else if (physicsManifoldsCount > 0 || usedMemory != 0) printf("[PHYSAC] physics module closed with %i still allocated manifolds [MEMORY: %i bytes]\n", physicsManifoldsCount, usedMemory);
         else printf("[PHYSAC] physics module closed successfully\n");
     #endif
 
@@ -1113,35 +1121,35 @@ static void PhysicsStep(void)
     // Generate new collision information
     for (int i = 0; i < physicsBodiesCount; i++)
     {
-        PhysicsBody A = bodies[i];
+        PhysicsBody bodyA = bodies[i];
         
-        if (A != NULL)
+        if (bodyA != NULL)
         {
             for (int j = i + 1; j < physicsBodiesCount; j++)
             {
-                PhysicsBody B = bodies[j];
+                PhysicsBody bodyB = bodies[j];
                 
-                if (B != NULL)
+                if (bodyB != NULL)
                 {
-                    if ((A->inverseMass == 0) && (B->inverseMass == 0)) continue;
+                    if ((bodyA->inverseMass == 0) && (bodyB->inverseMass == 0)) continue;
 
-                    PhysicsManifold manifold;
-                    if (A->shape.type == PHYSICS_POLYGON && B->shape.type == PHYSICS_CIRCLE) manifold = CreatePhysicsManifold(B, A);
-                    else manifold = CreatePhysicsManifold(A, B);
+                    PhysicsManifold manifold = NULL;
+                    if (bodyA->shape.type == PHYSICS_POLYGON && bodyB->shape.type == PHYSICS_CIRCLE) manifold = CreatePhysicsManifold(bodyB, bodyA);
+                    else manifold = CreatePhysicsManifold(bodyA, bodyB);
                     SolvePhysicsManifold(manifold);
 
                     if (manifold->contactsCount > 0)
                     {
                         // Create a new manifold with same information as previously solved manifold and add it to the manifolds pool last slot
-                        PhysicsManifold newManifold = CreatePhysicsManifold(A, B);
+                        PhysicsManifold newManifold = CreatePhysicsManifold(bodyA, bodyB);
                         newManifold->penetration = manifold->penetration;
                         newManifold->normal = manifold->normal;
                         newManifold->contacts[0] = manifold->contacts[0];
                         newManifold->contacts[1] = manifold->contacts[1];
                         newManifold->contactsCount = manifold->contactsCount;
-                        newManifold->e = manifold->e;
-                        newManifold->df = manifold->df;
-                        newManifold->sf = manifold->sf;
+                        newManifold->restitution = manifold->restitution;
+                        newManifold->dynamicFriction = manifold->dynamicFriction;
+                        newManifold->staticFriction = manifold->staticFriction;
                     }
                 }
             }
@@ -1238,9 +1246,9 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         newManifold->contacts[0] = (Vector2){ 0 };
         newManifold->contacts[1] = (Vector2){ 0 };
         newManifold->contactsCount = 0;
-        newManifold->e = 0;
-        newManifold->df = 0;
-        newManifold->sf = 0;
+        newManifold->restitution = 0;
+        newManifold->dynamicFriction = 0;
+        newManifold->staticFriction = 0;
 
         // Add new body to bodies pointers array and update bodies count
         contacts[physicsManifoldsCount] = newManifold;
@@ -1323,74 +1331,74 @@ static void SolvePhysicsManifold(PhysicsManifold manifold)
 // Solves collision between two circle shape physics bodies
 static void SolveCircleToCircle(PhysicsManifold manifold)
 {
-    PhysicsBody A = manifold->bodyA;
-    PhysicsBody B = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
     // Calculate translational vector, which is normal
-    Vector2 normal = Vector2Subtract(B->position, A->position);
+    Vector2 normal = Vector2Subtract(bodyB->position, bodyA->position);
 
-    float dist_sqr = MathLenSqr(normal);
-    float radius = A->shape.radius + B->shape.radius;
+    float distSqr = MathLenSqr(normal);
+    float radius = bodyA->shape.radius + bodyB->shape.radius;
 
     // Check if circles are not in contact
-    if (dist_sqr >= radius*radius)
+    if (distSqr >= radius*radius)
     {
         manifold->contactsCount = 0;
         return;
     }
 
-    float distance = sqrtf(dist_sqr);
+    float distance = sqrtf(distSqr);
     manifold->contactsCount = 1;
 
     if (distance == 0)
     {
-        manifold->penetration = A->shape.radius;
+        manifold->penetration = bodyA->shape.radius;
         manifold->normal = (Vector2){ 1, 0 };
-        manifold->contacts[0] = A->position;
+        manifold->contacts[0] = bodyA->position;
     }
     else
     {
         manifold->penetration = radius - distance;
         manifold->normal = (Vector2){ normal.x/distance, normal.y/distance }; // Faster than using MathNormalize() due to sqrt is already performed
-        manifold->contacts[0] = (Vector2){ manifold->normal.x*A->shape.radius + A->position.x, manifold->normal.y*A->shape.radius + A->position.y };
+        manifold->contacts[0] = (Vector2){ manifold->normal.x*bodyA->shape.radius + bodyA->position.x, manifold->normal.y*bodyA->shape.radius + bodyA->position.y };
     }
 }
 
 // Solves collision between a circle to a polygon shape physics bodies
 static void SolveCircleToPolygon(PhysicsManifold manifold)
 {
-    PhysicsBody A = manifold->bodyA;
-    PhysicsBody B = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
     manifold->contactsCount = 0;
 
     // Transform circle center to polygon transform space
-    Vector2 center = A->position;
-    center = Mat2MultiplyVector2(Mat2Transpose(B->shape.vertexData.transform), Vector2Subtract(center, B->position));
+    Vector2 center = bodyA->position;
+    center = Mat2MultiplyVector2(Mat2Transpose(bodyB->shape.vertexData.transform), Vector2Subtract(center, bodyB->position));
 
     // Find edge with minimum penetration
     // It is the same concept as using support points in SolvePolygonToPolygon
     float separation = -MATH_FLT_MAX;
     int faceNormal = 0;
-    PolygonData vertexData = B->shape.vertexData;
+    PolygonData vertexData = bodyB->shape.vertexData;
 
     for (int i = 0; i < vertexData.vertexCount; i++)
     {
-        float s = MathDot(vertexData.normals[i], Vector2Subtract(center, vertexData.vertices[i]));
+        float currentSeparation = MathDot(vertexData.normals[i], Vector2Subtract(center, vertexData.vertices[i]));
         
-        if (s > A->shape.radius) return;
+        if (currentSeparation > bodyA->shape.radius) return;
         
-        if (s > separation)
+        if (currentSeparation > separation)
         {
-            separation = s;
+            separation = currentSeparation;
             faceNormal = i;
         }
     }
 
     // Grab face's vertices
     Vector2 v1 = vertexData.vertices[faceNormal];
-    int ii = (((faceNormal + 1) < vertexData.vertexCount) ? (faceNormal + 1) : 0);
-    Vector2 v2 = vertexData.vertices[ii];
+    int nextIndex = (((faceNormal + 1) < vertexData.vertexCount) ? (faceNormal + 1) : 0);
+    Vector2 v2 = vertexData.vertices[nextIndex];
 
     // Check to see if center is within polygon
     if (separation < MATH_EPSILON)
@@ -1398,19 +1406,19 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
         manifold->contactsCount = 1;
         Vector2 normal = Mat2MultiplyVector2(vertexData.transform, vertexData.normals[faceNormal]);
         manifold->normal = (Vector2){ -normal.x, -normal.y };
-        manifold->contacts[0] = (Vector2){ manifold->normal.x*A->shape.radius + A->position.x, manifold->normal.y*A->shape.radius + A->position.y };
-        manifold->penetration = A->shape.radius;
+        manifold->contacts[0] = (Vector2){ manifold->normal.x*bodyA->shape.radius + bodyA->position.x, manifold->normal.y*bodyA->shape.radius + bodyA->position.y };
+        manifold->penetration = bodyA->shape.radius;
         return;
     }
 
     // Determine which voronoi region of the edge center of circle lies within
     float dot1 = MathDot(Vector2Subtract(center, v1), Vector2Subtract(v2, v1));
     float dot2 = MathDot(Vector2Subtract(center, v2), Vector2Subtract(v1, v2));
-    manifold->penetration = A->shape.radius - separation;
+    manifold->penetration = bodyA->shape.radius - separation;
 
     if (dot1 <= 0) // Closest to v1
     {        
-        if (DistSqr(center, v1) > A->shape.radius*A->shape.radius) return;
+        if (DistSqr(center, v1) > bodyA->shape.radius*bodyA->shape.radius) return;
         
         manifold->contactsCount = 1;
         Vector2 normal = Vector2Subtract(v1, center);
@@ -1418,17 +1426,17 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
         MathNormalize(&normal);
         manifold->normal = normal;
         v1 = Mat2MultiplyVector2(vertexData.transform, v1);
-        v1 = Vector2Add(v1, B->position);
+        v1 = Vector2Add(v1, bodyB->position);
         manifold->contacts[0] = v1;
     }
     else if (dot2 <= 0) // Closest to v2
     {
-        if (DistSqr(center, v2) > A->shape.radius*A->shape.radius) return;
+        if (DistSqr(center, v2) > bodyA->shape.radius*bodyA->shape.radius) return;
         
         manifold->contactsCount = 1;
         Vector2 normal = Vector2Subtract(v2, center);
         v2 = Mat2MultiplyVector2(vertexData.transform, v2);
-        v2 = Vector2Add(v2, B->position);
+        v2 = Vector2Add(v2, bodyB->position);
         manifold->contacts[0] = v2;
         normal = Mat2MultiplyVector2(vertexData.transform, normal);
         MathNormalize(&normal);
@@ -1437,11 +1445,11 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
     else // Closest to face
     {
         Vector2 normal = vertexData.normals[faceNormal];
-        if (MathDot(Vector2Subtract(center, v1), normal) > A->shape.radius) return;
+        if (MathDot(Vector2Subtract(center, v1), normal) > bodyA->shape.radius) return;
         
         normal = Mat2MultiplyVector2(vertexData.transform, normal);
         manifold->normal = (Vector2){ -normal.x, -normal.y };
-        manifold->contacts[0] = (Vector2){ manifold->normal.x*A->shape.radius + A->position.x, manifold->normal.y*A->shape.radius + A->position.y };
+        manifold->contacts[0] = (Vector2){ manifold->normal.x*bodyA->shape.radius + bodyA->position.x, manifold->normal.y*bodyA->shape.radius + bodyA->position.y };
         manifold->contactsCount = 1;
     }
 }
@@ -1449,11 +1457,11 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
 // Solves collision between a polygon to a circle shape physics bodies
 static void SolvePolygonToCircle(PhysicsManifold manifold)
 {
-    PhysicsBody A = manifold->bodyA;
-    PhysicsBody B = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
-    manifold->bodyA = B;
-    manifold->bodyB = A;
+    manifold->bodyA = bodyB;
+    manifold->bodyB = bodyA;
     SolveCircleToPolygon(manifold);
 
     manifold->normal.x *= -1;
@@ -1463,18 +1471,18 @@ static void SolvePolygonToCircle(PhysicsManifold manifold)
 // Solves collision between two polygons shape physics bodies
 static void SolvePolygonToPolygon(PhysicsManifold manifold)
 {
-    PhysicsShape A = manifold->bodyA->shape;
-    PhysicsShape B = manifold->bodyB->shape;
+    PhysicsShape bodyA = manifold->bodyA->shape;
+    PhysicsShape bodyB = manifold->bodyB->shape;
     manifold->contactsCount = 0;
 
     // Check for separating axis with A shape's face planes
     int faceA = 0;
-    float penetrationA = FindAxisLeastPenetration(&faceA, A, B);
+    float penetrationA = FindAxisLeastPenetration(&faceA, bodyA, bodyB);
     if (penetrationA >= 0) return;
 
     // Check for separating axis with B shape's face planes
     int faceB = 0;
-    float penetrationB = FindAxisLeastPenetration(&faceB, B, A);
+    float penetrationB = FindAxisLeastPenetration(&faceB, bodyB, bodyA);
     if (penetrationB >= 0) return;
 
     int referenceIndex = 0;
@@ -1486,14 +1494,14 @@ static void SolvePolygonToPolygon(PhysicsManifold manifold)
     // Determine which shape contains reference face
     if (BiasGreaterThan(penetrationA, penetrationB))
     {
-        refPoly = A;
-        incPoly = B;
+        refPoly = bodyA;
+        incPoly = bodyB;
         referenceIndex = faceA;
     }
     else
     {
-        refPoly = B;
-        incPoly = A;
+        refPoly = bodyB;
+        incPoly = bodyA;
         referenceIndex = faceB;
         flip = true;
     }
@@ -1532,28 +1540,28 @@ static void SolvePolygonToPolygon(PhysicsManifold manifold)
     manifold->normal = (flip ? (Vector2){ -refFaceNormal.x, -refFaceNormal.y } : refFaceNormal);
 
     // Keep points behind reference face
-    int cp = 0; // Clipped points behind reference face
+    int currentPoint = 0; // Clipped points behind reference face
     float separation = MathDot(refFaceNormal, incidentFace[0]) - refC;
     if (separation <= 0)
     {
-        manifold->contacts[cp] = incidentFace[0];
+        manifold->contacts[currentPoint] = incidentFace[0];
         manifold->penetration = -separation;
-        cp++;
+        currentPoint++;
     }
     else manifold->penetration = 0;
 
     separation = MathDot(refFaceNormal, incidentFace[1]) - refC;
     if (separation <= 0)
     {
-        manifold->contacts[cp] = incidentFace[1];
+        manifold->contacts[currentPoint] = incidentFace[1];
         manifold->penetration += -separation;
-        cp++;
+        currentPoint++;
         
         // Calculate total penetration average
-        manifold->penetration /= (float)cp;
+        manifold->penetration /= currentPoint;
     }
 
-    manifold->contactsCount = cp;
+    manifold->contactsCount = currentPoint;
 }
 
 // Integrates physics forces into velocity
@@ -1576,128 +1584,126 @@ static void IntegratePhysicsForces(PhysicsBody body)
 // Initializes physics manifolds to solve collisions
 static void InitializePhysicsManifolds(PhysicsManifold manifold)
 {
-    PhysicsBody A = manifold->bodyA;
-    PhysicsBody B = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
-    // Calculate average restitution
-    manifold->e = (A->restitution + B->restitution)/2;
-
-    // Calculate static and dynamic friction
-    manifold->sf = sqrtf(A->staticFriction*B->staticFriction);
-    manifold->df = sqrtf(A->dynamicFriction*B->dynamicFriction);
+    // Calculate average restitution, static and dynamic friction
+    manifold->restitution = sqrtf(bodyA->restitution*bodyB->restitution);
+    manifold->staticFriction = sqrtf(bodyA->staticFriction*bodyB->staticFriction);
+    manifold->dynamicFriction = sqrtf(bodyA->dynamicFriction*bodyB->dynamicFriction);
 
     for (int i = 0; i < 2; i++)
     {
         // Caculate radius from center of mass to contact
-        Vector2 ra = Vector2Subtract(manifold->contacts[i], A->position);
-        Vector2 rb = Vector2Subtract(manifold->contacts[i], B->position);
+        Vector2 radiusA = Vector2Subtract(manifold->contacts[i], bodyA->position);
+        Vector2 radiusB = Vector2Subtract(manifold->contacts[i], bodyB->position);
 
-        Vector2 crossB = MathCross(B->angularVelocity, rb);
-        Vector2 crossA = MathCross(A->angularVelocity, ra);
+        Vector2 crossA = MathCross(bodyA->angularVelocity, radiusA);
+        Vector2 crossB = MathCross(bodyB->angularVelocity, radiusB);
 
-        Vector2 rv = { 0 };
-        rv.x = B->velocity.x + crossB.x - A->velocity.x - crossA.x;
-        rv.y = B->velocity.y + crossB.y - A->velocity.y - crossA.y;
+        Vector2 radiusV = { 0 };
+        radiusV.x = bodyB->velocity.x + crossB.x - bodyA->velocity.x - crossA.x;
+        radiusV.y = bodyB->velocity.y + crossB.y - bodyA->velocity.y - crossA.y;
 
         // Determine if we should perform a resting collision or not;
         // The idea is if the only thing moving this object is gravity, then the collision should be performed without any restitution
-        if (MathLenSqr(rv) < (MathLenSqr((Vector2){ gravityForce.x*deltaTime, gravityForce.y*deltaTime }) + MATH_EPSILON)) manifold->e = 0;
+        if (MathLenSqr(radiusV) < (MathLenSqr((Vector2){ gravityForce.x*deltaTime, gravityForce.y*deltaTime }) + MATH_EPSILON)) manifold->restitution = 0;
     }
 }
 
 // Integrates physics collisions impulses to solve collisions
 static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 {
-    PhysicsBody A = manifold->bodyA;
-    PhysicsBody B = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
     // Early out and positional correct if both objects have infinite mass
-    if (fabs(A->inverseMass + B->inverseMass) <= MATH_EPSILON)
+    if (fabs(bodyA->inverseMass + bodyB->inverseMass) <= MATH_EPSILON)
     {
-        A->velocity = (Vector2){ 0 };        
-        B->velocity = (Vector2){ 0 };
+        bodyA->velocity = (Vector2){ 0 };        
+        bodyB->velocity = (Vector2){ 0 };
         return;
     }
 
     for (int i = 0; i < manifold->contactsCount; i++)
     {
         // Calculate radius from center of mass to contact
-        Vector2 ra = Vector2Subtract(manifold->contacts[i], A->position);
-        Vector2 rb = Vector2Subtract(manifold->contacts[i], B->position);
+        Vector2 radiusA = Vector2Subtract(manifold->contacts[i], bodyA->position);
+        Vector2 radiusB = Vector2Subtract(manifold->contacts[i], bodyB->position);
 
         // Calculate relative velocity
-        Vector2 rv = { 0 };
-        rv.x = B->velocity.x + MathCross(B->angularVelocity, rb).x - A->velocity.x - MathCross(A->angularVelocity, ra).x;
-        rv.y = B->velocity.y + MathCross(B->angularVelocity, rb).y - A->velocity.y - MathCross(A->angularVelocity, ra).y;
+        Vector2 radiusV = { 0 };
+        radiusV.x = bodyB->velocity.x + MathCross(bodyB->angularVelocity, radiusB).x - bodyA->velocity.x - MathCross(bodyA->angularVelocity, radiusA).x;
+        radiusV.y = bodyB->velocity.y + MathCross(bodyB->angularVelocity, radiusB).y - bodyA->velocity.y - MathCross(bodyA->angularVelocity, radiusA).y;
 
         // Relative velocity along the normal
-        float contactVelocity = MathDot(rv, manifold->normal);
+        float contactVelocity = MathDot(radiusV, manifold->normal);
 
         // Do not resolve if velocities are separating
         if (contactVelocity > 0) return;
 
-        float raCrossN = MathCrossVector2(ra, manifold->normal);
-        float rbCrossN = MathCrossVector2(rb, manifold->normal);
+        float raCrossN = MathCrossVector2(radiusA, manifold->normal);
+        float rbCrossN = MathCrossVector2(radiusB, manifold->normal);
 
-        float inverseMassSum = A->inverseMass + B->inverseMass + (raCrossN*raCrossN)*A->inverseInertia + (rbCrossN*rbCrossN)*B->inverseInertia;
+        float inverseMassSum = bodyA->inverseMass + bodyB->inverseMass + (raCrossN*raCrossN)*bodyA->inverseInertia + (rbCrossN*rbCrossN)*bodyB->inverseInertia;
 
         // Calculate impulse scalar value
-        float j = -(1.0f + manifold->e)*contactVelocity;
-        j /= inverseMassSum;                
-        j /= (float)manifold->contactsCount;
+        float impulse = -(1.0f + manifold->restitution)*contactVelocity;
+        impulse /= inverseMassSum;                
+        impulse /= (float)manifold->contactsCount;
 
         // Apply impulse to each physics body
-        Vector2 impulse = { manifold->normal.x*j, manifold->normal.y*j };
+        Vector2 impulseV = { manifold->normal.x*impulse, manifold->normal.y*impulse };
 
-        if (A->enabled)
+        if (bodyA->enabled)
         {
-            A->velocity.x += A->inverseMass*(-impulse.x);
-            A->velocity.y += A->inverseMass*(-impulse.y);
-            A->angularVelocity += A->inverseInertia*MathCrossVector2(ra, (Vector2){ -impulse.x, -impulse.y });
+            bodyA->velocity.x += bodyA->inverseMass*(-impulseV.x);
+            bodyA->velocity.y += bodyA->inverseMass*(-impulseV.y);
+            bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -impulseV.x, -impulseV.y });
         }
 
-        if (B->enabled)
+        if (bodyB->enabled)
         {
-            B->velocity.x += B->inverseMass*(impulse.x);
-            B->velocity.y += B->inverseMass*(impulse.y);
-            B->angularVelocity += B->inverseInertia*MathCrossVector2(rb, impulse);
+            bodyB->velocity.x += bodyB->inverseMass*(impulseV.x);
+            bodyB->velocity.y += bodyB->inverseMass*(impulseV.y);
+            bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, impulseV);
         }
 
         // Apply friction impulse to each physics body
-        rv.x = B->velocity.x + MathCross(B->angularVelocity, rb).x - A->velocity.x - MathCross(A->angularVelocity, ra).x;
-        rv.y = B->velocity.y + MathCross(B->angularVelocity, rb).y - A->velocity.y - MathCross(A->angularVelocity, ra).y;
+        radiusV.x = bodyB->velocity.x + MathCross(bodyB->angularVelocity, radiusB).x - bodyA->velocity.x - MathCross(bodyA->angularVelocity, radiusA).x;
+        radiusV.y = bodyB->velocity.y + MathCross(bodyB->angularVelocity, radiusB).y - bodyA->velocity.y - MathCross(bodyA->angularVelocity, radiusA).y;
 
-        Vector2 t = { rv.x - (manifold->normal.x*MathDot(rv, manifold->normal)), rv.y - (manifold->normal.y*MathDot(rv, manifold->normal)) };
-        MathNormalize(&t);
+        Vector2 tangent = { radiusV.x - (manifold->normal.x*MathDot(radiusV, manifold->normal)), radiusV.y - (manifold->normal.y*MathDot(radiusV, manifold->normal)) };
+        MathNormalize(&tangent);
 
-        // Calculate 'j' tangent magnitude
-        float jt = -MathDot(rv, t);
-        jt /= inverseMassSum;
-        jt /= (float)manifold->contactsCount;
+        // Calculate impulse tangent magnitude
+        float impulseTangent = -MathDot(radiusV, tangent);
+        impulseTangent /= inverseMassSum;
+        impulseTangent /= (float)manifold->contactsCount;
 
-        float absJt = fabs(jt);
+        float absImpulseTangent = fabs(impulseTangent);
 
         // Don't apply tiny friction impulses
-        if (absJt <= MATH_EPSILON) return;
+        if (absImpulseTangent <= MATH_EPSILON) return;
 
         // Apply coulumb's law
-        Vector2 tangentImpulse;
-        if (absJt < j*manifold->sf) tangentImpulse = (Vector2){ t.x*jt, t.y*jt };
-        else tangentImpulse = (Vector2){ t.x*-j*manifold->df, t.y*-j*manifold->df };
+        Vector2 tangentImpulse = { 0 };
+        if (absImpulseTangent < impulse*manifold->staticFriction) tangentImpulse = (Vector2){ tangent.x*impulseTangent, tangent.y*impulseTangent };
+        else tangentImpulse = (Vector2){ tangent.x*-impulse*manifold->dynamicFriction, tangent.y*-impulse*manifold->dynamicFriction };
 
         // Apply friction impulse
-        if (A->enabled)
+        if (bodyA->enabled)
         {
-            A->velocity.x += A->inverseMass*(-tangentImpulse.x);
-            A->velocity.y += A->inverseMass*(-tangentImpulse.y);
-            A->angularVelocity += A->inverseInertia*MathCrossVector2(ra, (Vector2){ -tangentImpulse.x, -tangentImpulse.y });
+            bodyA->velocity.x += bodyA->inverseMass*(-tangentImpulse.x);
+            bodyA->velocity.y += bodyA->inverseMass*(-tangentImpulse.y);
+            bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -tangentImpulse.x, -tangentImpulse.y });
         }
 
-        if (B->enabled)
+        if (bodyB->enabled)
         {
-            B->velocity.x += B->inverseMass*(tangentImpulse.x);
-            B->velocity.y += B->inverseMass*(tangentImpulse.y);
-            B->angularVelocity += B->inverseInertia*MathCrossVector2(rb, tangentImpulse);
+            bodyB->velocity.x += bodyB->inverseMass*(tangentImpulse.x);
+            bodyB->velocity.y += bodyB->inverseMass*(tangentImpulse.y);
+            bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, tangentImpulse);
         }
     }
 }
@@ -1717,23 +1723,23 @@ static void IntegratePhysicsVelocity(PhysicsBody body)
 // Corrects physics bodies positions based on manifolds collision information
 static void CorrectPhysicsPositions(PhysicsManifold manifold)
 {
-    PhysicsBody A = manifold->bodyA;
-    PhysicsBody B = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
     Vector2 correction = { 0 };
-    correction.x = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(A->inverseMass + B->inverseMass))*manifold->normal.x*PENETRATION_CORRECTION;
-    correction.y = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(A->inverseMass + B->inverseMass))*manifold->normal.y*PENETRATION_CORRECTION;
+    correction.x = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(bodyA->inverseMass + bodyB->inverseMass))*manifold->normal.x*PENETRATION_CORRECTION;
+    correction.y = (max(manifold->penetration - PENETRATION_ALLOWANCE, 0)/(bodyA->inverseMass + bodyB->inverseMass))*manifold->normal.y*PENETRATION_CORRECTION;
 
-    if (A->enabled)
+    if (bodyA->enabled)
     {
-        A->position.x -= correction.x*A->inverseMass;
-        A->position.y -= correction.y*A->inverseMass;
+        bodyA->position.x -= correction.x*bodyA->inverseMass;
+        bodyA->position.y -= correction.y*bodyA->inverseMass;
     }
 
-    if (B->enabled)
+    if (bodyB->enabled)
     {
-        B->position.x += correction.x*B->inverseMass;
-        B->position.y += correction.y*B->inverseMass;
+        bodyB->position.x += correction.x*bodyB->inverseMass;
+        bodyB->position.y += correction.y*bodyB->inverseMass;
     }
 }
 
@@ -1746,12 +1752,12 @@ static Vector2 GetSupport(PhysicsShape shape, Vector2 dir)
 
     for (int i = 0; i < data.vertexCount; i++)
     {
-        Vector2 v = data.vertices[i];
-        float projection = MathDot(v, dir);
+        Vector2 vertex = data.vertices[i];
+        float projection = MathDot(vertex, dir);
         
         if (projection > bestProjection)
         {
-            bestVertex = v;
+            bestVertex = vertex;
             bestProjection = projection;
         }
     }
@@ -1760,41 +1766,41 @@ static Vector2 GetSupport(PhysicsShape shape, Vector2 dir)
 }
 
 // Finds polygon shapes axis least penetration
-static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape A, PhysicsShape B)
+static float FindAxisLeastPenetration(int *faceIndex, PhysicsShape shapeA, PhysicsShape shapeB)
 {
     float bestDistance = -MATH_FLT_MAX;
     int bestIndex = 0;
 
-    PolygonData dataA = A.vertexData;
-    PolygonData dataB = B.vertexData;
+    PolygonData dataA = shapeA.vertexData;
+    PolygonData dataB = shapeB.vertexData;
 
     for (int i = 0; i < dataA.vertexCount; i++)
     {
         // Retrieve a face normal from A shape
-        Vector2 n = dataA.normals[i];
-        Vector2 nw = Mat2MultiplyVector2(dataA.transform, n);
+        Vector2 normal = dataA.normals[i];
+        Vector2 transNormal = Mat2MultiplyVector2(dataA.transform, normal);
 
         // Transform face normal into B shape's model space
         Mat2 buT = Mat2Transpose(dataB.transform);
-        n = Mat2MultiplyVector2(buT, nw);
+        normal = Mat2MultiplyVector2(buT, transNormal);
 
         // Retrieve support point from B shape along -n
-        Vector2 s = GetSupport(B, (Vector2){ -n.x, -n.y });
+        Vector2 support = GetSupport(shapeB, (Vector2){ -normal.x, -normal.y });
 
         // Retrieve vertex on face from A shape, transform into B shape's model space
-        Vector2 v = dataA.vertices[i];
-        v = Mat2MultiplyVector2(dataA.transform, v);
-        v = Vector2Add(v, A.body->position);
-        v = Vector2Subtract(v, B.body->position);
-        v = Mat2MultiplyVector2(buT, v);
+        Vector2 vertex = dataA.vertices[i];
+        vertex = Mat2MultiplyVector2(dataA.transform, vertex);
+        vertex = Vector2Add(vertex, shapeA.body->position);
+        vertex = Vector2Subtract(vertex, shapeB.body->position);
+        vertex = Mat2MultiplyVector2(buT, vertex);
 
         // Compute penetration distance in B shape's model space
-        float d = MathDot(n, Vector2Subtract(s, v));
+        float distance = MathDot(normal, Vector2Subtract(support, vertex));
 
         // Store greatest distance
-        if (d > bestDistance)
+        if (distance > bestDistance)
         {
-            bestDistance = d;
+            bestDistance = distance;
             bestIndex = i;
         }
     }
@@ -1839,24 +1845,24 @@ static void FindIncidentFace(Vector2 *v0, Vector2 *v1, PhysicsShape ref, Physics
 }
 
 // Calculates clipping based on a normal and two faces
-static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB)
+static int Clip(Vector2 normal, float clip, Vector2 *faceA, Vector2 *faceB)
 {
     int sp = 0;
     Vector2 out[2] = { *faceA, *faceB };
 
     // Retrieve distances from each endpoint to the line
-    float d1 = MathDot(n, *faceA) - c;
-    float d2 = MathDot(n, *faceB) - c;
+    float distanceA = MathDot(normal, *faceA) - clip;
+    float distanceB = MathDot(normal, *faceB) - clip;
 
     // If negative (behind plane)
-    if (d1 <= 0) out[sp++] = *faceA;
-    if (d2 <= 0) out[sp++] = *faceB;
+    if (distanceA <= 0) out[sp++] = *faceA;
+    if (distanceB <= 0) out[sp++] = *faceB;
 
     // If the points are on different sides of the plane
-    if ((d1*d2) < 0)
+    if ((distanceA*distanceB) < 0)
     {
         // Push intersection point
-        float alpha = d1/(d1 - d2);
+        float alpha = distanceA/(distanceA - distanceB);
         out[sp] = *faceA;
         Vector2 delta = Vector2Subtract(*faceB, *faceA);
         delta.x *= alpha;
@@ -1873,24 +1879,24 @@ static int Clip(Vector2 n, float c, Vector2 *faceA, Vector2 *faceB)
 }
 
 // Check if values are between bias range
-static bool BiasGreaterThan(float a, float b)
+static bool BiasGreaterThan(float valueA, float valueB)
 {
-    return (a >= (b*0.95f + a*0.01f));
+    return (valueA >= (valueB*0.95f + valueA*0.01f));
 }
 
 // Returns the barycenter of a triangle given by 3 points
-static Vector2 TriangleBarycenter(Vector2 a, Vector2 b, Vector2 c)
+static Vector2 TriangleBarycenter(Vector2 v1, Vector2 v2, Vector2 v3)
 {
     Vector2 result = { 0 };
 
-    result.x = (a.x + b.x + c.x)/3;
-    result.y = (a.y + b.y + c.y)/3;
+    result.x = (v1.x + v2.x + v3.x)/3;
+    result.y = (v1.y + v2.y + v3.y)/3;
 
     return result;
 }
 
 // Initializes hi-resolution timer
-static void InitTimer()
+static void InitTimer(void)
 {
     srand(time(NULL));              // Initialize random seed
 
@@ -1948,62 +1954,62 @@ static inline void MathClamp(double *value, double min, double max)
 }
 
 // Returns the cross product of a vector and a value
-static inline Vector2 MathCross(float a, Vector2 v)
+static inline Vector2 MathCross(float value, Vector2 vector)
 {
-    return (Vector2){ -a*v.y, a*v.x };
+    return (Vector2){ -value*vector.y, value*vector.x };
 }
 
 // Returns the cross product of two vectors
-static inline float MathCrossVector2(Vector2 a, Vector2 b)
+static inline float MathCrossVector2(Vector2 v1, Vector2 v2)
 {
-    return (a.x*b.y - a.y*b.x);
+    return (v1.x*v2.y - v1.y*v2.x);
 }
 
 // Returns the len square root of a vector
-static inline float MathLenSqr(Vector2 v)
+static inline float MathLenSqr(Vector2 vector)
 {
-    return (v.x*v.x + v.y*v.y);
+    return (vector.x*vector.x + vector.y*vector.y);
 }
 
 // Returns the dot product of two vectors
-static inline float MathDot(Vector2 a, Vector2 b)
+static inline float MathDot(Vector2 v1, Vector2 v2)
 {
-    return (a.x*b.x + a.y*b.y);
+    return (v1.x*v2.x + v1.y*v2.y);
 }
 
 // Returns the square root of distance between two vectors
-static inline float DistSqr(Vector2 a, Vector2 b)
+static inline float DistSqr(Vector2 v1, Vector2 v2)
 {
-    Vector2 c = Vector2Subtract(a, b);
-    return MathDot(c, c);
+    Vector2 dir = Vector2Subtract(v1, v2);
+    return MathDot(dir, dir);
 }
 
 // Returns the normalized values of a vector
-static void MathNormalize(Vector2 *v)
+static void MathNormalize(Vector2 *vector)
 {
     float length, ilength;
 
-    Vector2 vector = *v;
-    length = sqrtf(vector.x*vector.x + vector.y*vector.y);
+    Vector2 aux = *vector;
+    length = sqrtf(aux.x*aux.x + aux.y*aux.y);
 
     if (length == 0) length = 1.0f;
 
     ilength = 1.0f/length;
 
-    v->x *= ilength;
-    v->y *= ilength;
+    vector->x *= ilength;
+    vector->y *= ilength;
 }
 
 // Returns the sum of two given vectors
-static inline Vector2 Vector2Add(Vector2 a, Vector2 b)
+static inline Vector2 Vector2Add(Vector2 v1, Vector2 v2)
 {
-    return (Vector2){ a.x + b.x, a.y + b.y };
+    return (Vector2){ v1.x + v2.x, v1.y + v2.y };
 }
 
 // Returns the subtract of two given vectors
-static inline Vector2 Vector2Subtract(Vector2 a, Vector2 b)
+static inline Vector2 Vector2Subtract(Vector2 v1, Vector2 v2)
 {
-    return (Vector2){ a.x - b.x, a.y - b.y };
+    return (Vector2){ v1.x - v2.x, v1.y - v2.y };
 }
 
 // Creates a matrix 2x2 from a given radians value
@@ -2016,21 +2022,21 @@ static inline Mat2 Mat2Radians(float radians)
 }
 
 // Creates a matrix 2x2 from specific values
-static inline Mat2 CreateMat2(float a, float b, float c, float d)
+static inline Mat2 CreateMat2(float valueA, float valueB, float valueC, float valueD)
 {
-    return (Mat2){ a, b, c, d };
+    return (Mat2){ valueA, valueB, valueC, valueD };
 }
 
 // Set values from radians to a created matrix 2x2
 static void Mat2Set(Mat2 *matrix, float radians)
 {
-    float c = cosf(radians);
-    float s = sinf(radians);
+    float cos = cosf(radians);
+    float sin = sinf(radians);
 
-    matrix->m00 = c;
-    matrix->m01 = -s;
-    matrix->m10 = s;
-    matrix->m11 = c;
+    matrix->m00 = cos;
+    matrix->m01 = -sin;
+    matrix->m10 = sin;
+    matrix->m11 = cos;
 }
 
 // Converts to absolute value every matrix values
@@ -2055,15 +2061,15 @@ static inline Vector2 Mat2AxisY(Mat2 matrix)
 }
 
 // Returns the transpose of a given matrix 2x2
-static inline Mat2 Mat2Transpose(Mat2 m)
+static inline Mat2 Mat2Transpose(Mat2 matrix)
 {
-    return (Mat2){ m.m00, m.m10, m.m01, m.m11 };
+    return (Mat2){ matrix.m00, matrix.m10, matrix.m01, matrix.m11 };
 }
 
 // Multiplies a vector by a matrix 2x2
-static inline Vector2 Mat2MultiplyVector2(Mat2 m, Vector2 v)
+static inline Vector2 Mat2MultiplyVector2(Mat2 matrix, Vector2 vector)
 {
-    return (Vector2){ m.m00*v.x + m.m01*v.y, m.m10*v.x + m.m11*v.y };
+    return (Vector2){ matrix.m00*vector.x + matrix.m01*vector.y, matrix.m10*vector.x + matrix.m11*vector.y };
 }
 
 #endif  // PHYSAC_IMPLEMENTATION
