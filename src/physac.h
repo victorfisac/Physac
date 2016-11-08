@@ -81,7 +81,7 @@
 // Defines and Macros
 //----------------------------------------------------------------------------------
 #define     MAX_PHYSICS_BODIES              64
-#define     MAX_PHYSICS_MANIFOLDS           2048
+#define     MAX_PHYSICS_MANIFOLDS           4096
 #define     PHYSAC_MAX_VERTICES             24
 #define     PHYSAC_CIRCLE_VERTICES          24
 
@@ -795,13 +795,14 @@ PHYSACDEF PhysicsBody GetPhysicsBody(int index)
     {
         PhysicsBody body = bodies[index];
         if (body != NULL) return body;
-        #if defined(PHYSAC_DEBUG)
         else
         {
-            printf("[PHYSAC] error when trying to get a null reference physics body");
+            #if defined(PHYSAC_DEBUG)
+                printf("[PHYSAC] error when trying to get a null reference physics body");
+            #endif
+
             return NULL;
         }
-        #endif
     }
     #if defined(PHYSAC_DEBUG)
     else

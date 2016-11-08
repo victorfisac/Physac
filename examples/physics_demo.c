@@ -33,12 +33,12 @@ int main()
     InitPhysics();
 
     // Create floor rectangle physics body
-    PhysicsBody A = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
-    A->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    PhysicsBody floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
+    floor->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
 
     // Create obstacle circle physics body
-    PhysicsBody B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
-    B->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    PhysicsBody circle = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
+    circle->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -47,10 +47,11 @@ int main()
         // Update
         //----------------------------------------------------------------------------------
         // Destroy falling physics bodies
-        for (int i = physicsBodiesCount - 1; i >= 0; i--)
+        int bodiesCount = GetPhysicsBodiesCount();
+        for (int i = bodiesCount - 1; i >= 0; i--)
         {
-            PhysicsBody body = bodies[i];
-            if (body->position.y > screenHeight*2) DestroyPhysicsBody(body);
+            PhysicsBody body = GetPhysicsBody(i);
+            if (body != NULL && (body->position.y > screenHeight*2)) DestroyPhysicsBody(body);
         }
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, 8), 10);
@@ -60,11 +61,11 @@ int main()
         {
             ResetPhysics();
 
-            A = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
-            A->enabled = false;
+            floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
+            floor->enabled = false;
 
-            B = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
-            B->enabled = false;
+            circle = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
+            circle->enabled = false;
         }
         //----------------------------------------------------------------------------------
 
@@ -73,26 +74,29 @@ int main()
         BeginDrawing();
 
             ClearBackground(BLACK);
-            
+
             DrawFPS(screenWidth - 90, screenHeight - 30);
 
             // Draw created physics bodies
-            int bodiesCount = GetPhysicsBodiesCount();
+            bodiesCount = GetPhysicsBodiesCount();
             for (int i = 0; i < bodiesCount; i++)
             {
                 PhysicsBody body = GetPhysicsBody(i);
 
-                int vertexCount = GetPhysicsShapeVerticesCount(i);
-                for (int j = 0; j < vertexCount; j++)
+                if (body != NULL)
                 {
-                    // Get physics bodies shape vertices to draw lines
-                    // Note: GetPhysicsShapeVertex() already calculates rotation transformations
-                    Vector2 vertexA = GetPhysicsShapeVertex(body, j);
+                    int vertexCount = GetPhysicsShapeVerticesCount(i);
+                    for (int j = 0; j < vertexCount; j++)
+                    {
+                        // Get physics bodies shape vertices to draw lines
+                        // Note: GetPhysicsShapeVertex() already calculates rotation transformations
+                        Vector2 vertexA = GetPhysicsShapeVertex(body, j);
 
-                    int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
-                    Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
-                    
-                    DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
+                        int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
+                        Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
+                        
+                        DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
+                    }
                 }
             }
 

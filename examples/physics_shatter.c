@@ -33,7 +33,7 @@ int main()
     InitPhysics();
     SetPhysicsGravity(0, 0);
 
-    PhysicsBody A = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, PHYSAC_MAX_VERTICES), 10);
+    PhysicsBody body = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, 8), 10);
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -46,15 +46,17 @@ int main()
             ResetPhysics();
 
             // Create obstacle circle physics body
-            A = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, PHYSAC_MAX_VERTICES), 10);
+            body = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, 8), 10);
         }
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            for (int i = GetPhysicsBodiesCount(); i >= 0; i--)
+            // Note: some values need to be stored in variables due to asynchronous changes during main thread
+            int count = GetPhysicsBodiesCount();
+            for (int i = count - 1; i >= 0; i--)
             {
-                PhysicsBody body = bodies[i];
-                if (body != NULL) PhysicsShatter(body, GetMousePosition(), 10/body->inverseMass);
+                PhysicsBody currentBody = GetPhysicsBody(i);
+                if (currentBody != NULL) PhysicsShatter(currentBody, GetMousePosition(), 10/currentBody->inverseMass);
             }
         }
         //----------------------------------------------------------------------------------
@@ -69,17 +71,17 @@ int main()
             int bodiesCount = GetPhysicsBodiesCount();
             for (int i = 0; i < bodiesCount; i++)
             {
-                PhysicsBody body = GetPhysicsBody(i);
+                PhysicsBody currentBody = GetPhysicsBody(i);
 
                 int vertexCount = GetPhysicsShapeVerticesCount(i);
                 for (int j = 0; j < vertexCount; j++)
                 {
                     // Get physics bodies shape vertices to draw lines
                     // Note: GetPhysicsShapeVertex() already calculates rotation transformations
-                    Vector2 vertexA = GetPhysicsShapeVertex(body, j);
+                    Vector2 vertexA = GetPhysicsShapeVertex(currentBody, j);
 
                     int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
-                    Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
+                    Vector2 vertexB = GetPhysicsShapeVertex(currentBody, jj);
                     
                     DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
                 }
