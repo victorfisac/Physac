@@ -157,6 +157,7 @@ typedef struct PhysicsBodyData {
     float dynamicFriction;          // Friction when the body has movement (0 to 1)
     float restitution;              // Restitution coefficient of the body (0 to 1)
     bool useGravity;                // Apply gravity force to dynamics
+    bool freezeOrient;              // Physics rotation constraint
     PhysicsShape shape;             // Physics body shape information (type, radius, vertices, normals)
 } PhysicsBodyData;
 
@@ -404,6 +405,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float radius, float d
         newBody->dynamicFriction = 0;
         newBody->restitution = 0;
         newBody->useGravity = true;
+        newBody->freezeOrient = false;
         newBody->shape.type = PHYSICS_CIRCLE;
         newBody->shape.body = newBody;
         newBody->shape.radius = radius;
@@ -513,6 +515,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float
         newBody->dynamicFriction = 0.2f;
         newBody->restitution = 0;
         newBody->useGravity = true;
+        newBody->freezeOrient = false;
 
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
@@ -619,6 +622,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int si
         newBody->dynamicFriction = 0.2f;
         newBody->restitution = 0;
         newBody->useGravity = true;
+        newBody->freezeOrient = false;
 
         // Add new body to bodies pointers array and update bodies count
         bodies[physicsBodiesCount] = newBody;
@@ -1590,7 +1594,7 @@ static void IntegratePhysicsForces(PhysicsBody body)
         body->velocity.y += gravityForce.y*(deltaTime/2);
     }
 
-    body->angularVelocity += body->torque*body->inverseInertia*(deltaTime/2);
+    if (!body->freezeOrient) body->angularVelocity += body->torque*body->inverseInertia*(deltaTime/2);
 }
 
 // Initializes physics manifolds to solve collisions
@@ -1671,14 +1675,14 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
         {
             bodyA->velocity.x += bodyA->inverseMass*(-impulseV.x);
             bodyA->velocity.y += bodyA->inverseMass*(-impulseV.y);
-            bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -impulseV.x, -impulseV.y });
+            if (!bodyA->freezeOrient) bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -impulseV.x, -impulseV.y });
         }
 
         if (bodyB->enabled)
         {
             bodyB->velocity.x += bodyB->inverseMass*(impulseV.x);
             bodyB->velocity.y += bodyB->inverseMass*(impulseV.y);
-            bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, impulseV);
+            if (!bodyB->freezeOrient) bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, impulseV);
         }
 
         // Apply friction impulse to each physics body
@@ -1708,25 +1712,28 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
         {
             bodyA->velocity.x += bodyA->inverseMass*(-tangentImpulse.x);
             bodyA->velocity.y += bodyA->inverseMass*(-tangentImpulse.y);
-            bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -tangentImpulse.x, -tangentImpulse.y });
+            if (!bodyA->freezeOrient) bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -tangentImpulse.x, -tangentImpulse.y });
         }
 
         if (bodyB->enabled)
         {
             bodyB->velocity.x += bodyB->inverseMass*(tangentImpulse.x);
             bodyB->velocity.y += bodyB->inverseMass*(tangentImpulse.y);
-            bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, tangentImpulse);
+            if (!bodyB->freezeOrient) bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, tangentImpulse);
         }
     }
 }
 
 // Integrates physics velocity into position and forces
 static void IntegratePhysicsVelocity(PhysicsBody body)
-{    
-    body->position.x += body->velocity.x*deltaTime;
-    body->position.y += body->velocity.y*deltaTime;
+{
+    if (body->enabled)
+    {
+        body->position.x += body->velocity.x*deltaTime;
+        body->position.y += body->velocity.y*deltaTime;
+    }
 
-    body->orient += body->angularVelocity*deltaTime;
+    if (!body->freezeOrient) body->orient += body->angularVelocity*deltaTime;
     Mat2Set(&body->shape.vertexData.transform, body->orient);
 
     IntegratePhysicsForces(body);
