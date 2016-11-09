@@ -1722,9 +1722,7 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 
 // Integrates physics velocity into position and forces
 static void IntegratePhysicsVelocity(PhysicsBody body)
-{
-    if (!body->enabled) return;
-
+{    
     body->position.x += body->velocity.x*deltaTime;
     body->position.y += body->velocity.y*deltaTime;
 
