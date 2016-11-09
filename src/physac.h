@@ -1047,6 +1047,7 @@ static PolygonData CreateRectanglePolygon(Vector2 pos, Vector2 size)
     PolygonData data = { 0 };
 
     data.vertexCount = 4;
+    data.transform = Mat2Radians(0);
 
     // Calculate polygon vertices positions
     data.vertices[0] = (Vector2){ pos.x + size.x/2, pos.y - size.y/2 };
@@ -1727,11 +1728,10 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 // Integrates physics velocity into position and forces
 static void IntegratePhysicsVelocity(PhysicsBody body)
 {
-    if (body->enabled)
-    {
-        body->position.x += body->velocity.x*deltaTime;
-        body->position.y += body->velocity.y*deltaTime;
-    }
+    if (!body->enabled) return;
+
+    body->position.x += body->velocity.x*deltaTime;
+    body->position.y += body->velocity.y*deltaTime;
 
     if (!body->freezeOrient) body->orient += body->angularVelocity*deltaTime;
     Mat2Set(&body->shape.vertexData.transform, body->orient);
