@@ -53,20 +53,13 @@ int main()
         //----------------------------------------------------------------------------------
         if (IsKeyPressed('R'))
         {
-            ResetPhysics();
-
-            // Create floor rectangle physics body
-            floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, screenWidth, 100, 10);
-            floor->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
-            floor->restitution = 1;
-
-            // Create circles physics body
-            circleA = CreatePhysicsBodyCircle((Vector2){ screenWidth*0.25f, screenHeight/2 }, 30, 10);
-            circleA->restitution = 0;
-            circleB = CreatePhysicsBodyCircle((Vector2){ screenWidth*0.5f, screenHeight/2 }, 30, 10);
-            circleB->restitution = 0.5f;
-            circleC = CreatePhysicsBodyCircle((Vector2){ screenWidth*0.75f, screenHeight/2 }, 30, 10);
-            circleC->restitution = 1;
+            // Reset circles physics bodies position and velocity
+            circleA->position = (Vector2){ screenWidth*0.25f, screenHeight/2 };
+            circleA->velocity = (Vector2){ 0, 0 };
+            circleB->position = (Vector2){ screenWidth*0.5f, screenHeight/2 };
+            circleB->velocity = (Vector2){ 0, 0 };
+            circleC->position = (Vector2){ screenWidth*0.75f, screenHeight/2 };
+            circleC->velocity = (Vector2){ 0, 0 };
         }
         //----------------------------------------------------------------------------------
 
