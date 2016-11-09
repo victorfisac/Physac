@@ -199,6 +199,7 @@ PHYSACDEF PhysicsBody GetPhysicsBody(int index);                                
 PHYSACDEF int GetPhysicsShapeType(int index);                                           // Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON)
 PHYSACDEF int GetPhysicsShapeVerticesCount(int index);                                  // Returns the amount of vertices of a physics body shape
 PHYSACDEF Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex);                  // Returns transformed position of a body shape (body position + vertex transformed position)
+PHYSACDEF void SetPhysicsBodyRotation(PhysicsBody body, float radians);                 // Sets physics body shape transform based on radians parameter
 PHYSACDEF void DestroyPhysicsBody(PhysicsBody body);                                    // Unitializes and destroy a physics body
 PHYSACDEF void ResetPhysics(void);                                                      // Destroys created physics bodies and manifolds and resets global values
 PHYSACDEF void ClosePhysics(void);                                                      // Unitializes physics pointers and closes physics loop thread
@@ -399,9 +400,9 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float radius, float d
         newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
         newBody->inertia = newBody->mass*radius*radius;
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
-        newBody->staticFriction = 0.4f;
-        newBody->dynamicFriction = 0.2f;
-        newBody->restitution = 0.2f;
+        newBody->staticFriction = 0;
+        newBody->dynamicFriction = 0;
+        newBody->restitution = 0;
         newBody->useGravity = true;
         newBody->shape.type = PHYSICS_CIRCLE;
         newBody->shape.body = newBody;
@@ -510,7 +511,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         newBody->staticFriction = 0.4f;
         newBody->dynamicFriction = 0.2f;
-        newBody->restitution = 0.2f;
+        newBody->restitution = 0;
         newBody->useGravity = true;
 
         // Add new body to bodies pointers array and update bodies count
@@ -616,7 +617,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int si
         newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
         newBody->staticFriction = 0.4f;
         newBody->dynamicFriction = 0.2f;
-        newBody->restitution = 0.2f;
+        newBody->restitution = 0;
         newBody->useGravity = true;
 
         // Add new body to bodies pointers array and update bodies count
@@ -898,6 +899,17 @@ PHYSACDEF Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex)
     #endif
 
     return position;
+}
+
+// Sets physics body shape transform based on radians parameter
+PHYSACDEF void SetPhysicsBodyRotation(PhysicsBody body, float radians)
+{
+    if (body != NULL)
+    {
+        body->orient = radians;
+
+        if (body->shape.type == PHYSICS_POLYGON) body->shape.vertexData.transform = Mat2Radians(radians);
+    }
 }
 
 // Unitializes and destroys a physics body
