@@ -46,18 +46,7 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        // Destroy falling physics bodies
-        int bodiesCount = GetPhysicsBodiesCount();
-        for (int i = bodiesCount - 1; i >= 0; i--)
-        {
-            PhysicsBody body = GetPhysicsBody(i);
-            if (body != NULL && (body->position.y > screenHeight*2)) DestroyPhysicsBody(body);
-        }
-
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, 8), 10);
-        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), GetRandomValue(10, 45), 10);
-
-        if (IsKeyPressed('R'))
+        if (IsKeyPressed('R'))    // Reset physics input
         {
             ResetPhysics();
 
@@ -66,6 +55,18 @@ int main()
 
             circle = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
             circle->enabled = false;
+        }
+
+        // Physics body creation inputs
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, 8), 10);
+        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), GetRandomValue(10, 45), 10);
+
+        // Destroy falling physics bodies
+        int bodiesCount = GetPhysicsBodiesCount();
+        for (int i = bodiesCount - 1; i >= 0; i--)
+        {
+            PhysicsBody body = GetPhysicsBody(i);
+            if (body != NULL && (body->position.y > screenHeight*2)) DestroyPhysicsBody(body);
         }
         //----------------------------------------------------------------------------------
 
@@ -94,7 +95,7 @@ int main()
 
                         int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
                         Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
-                        
+
                         DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
                     }
                 }

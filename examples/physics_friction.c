@@ -65,8 +65,9 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyPressed('R'))
+        if (IsKeyPressed('R'))    // Reset physics input
         {
+            // Reset dynamic physics bodies position, velocity and rotation
             bodyA->position = (Vector2){ 35, screenHeight*0.6f };
             bodyA->velocity = (Vector2){ 0, 0 };
             SetPhysicsBodyRotation(bodyA, 30*DEG2RAD);

@@ -54,16 +54,19 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyPressed('R'))
+        if (IsKeyPressed('R'))    // Reset physics input
         {
+            // Reset movement physics body position, velocity and rotation
             body->position = (Vector2){ screenWidth/2, screenHeight/2 };
             body->velocity = (Vector2){ 0, 0 };
             SetPhysicsBodyRotation(body, 0);
         }
 
+        // Horizontal movement input
         if (IsKeyDown(KEY_RIGHT)) body->velocity.x = VELOCITY;
         else if (IsKeyDown(KEY_LEFT)) body->velocity.x = -VELOCITY;
 
+        // Vertical movement input checking if player physics body is on the floor
         if (IsKeyDown(KEY_UP) && body->position.y + 25 >= floor->position.y - 50) body->velocity.y = -VELOCITY*4;
         //----------------------------------------------------------------------------------
 
@@ -72,7 +75,7 @@ int main()
         BeginDrawing();
 
             ClearBackground(BLACK);
-            
+
             DrawFPS(screenWidth - 90, screenHeight - 30);
 
             // Draw created physics bodies
@@ -90,7 +93,7 @@ int main()
 
                     int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
                     Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
-                    
+
                     DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
                 }
             }

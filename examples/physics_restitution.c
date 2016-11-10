@@ -51,7 +51,7 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyPressed('R'))
+        if (IsKeyPressed('R'))    // Reset physics input
         {
             // Reset circles physics bodies position and velocity
             circleA->position = (Vector2){ screenWidth*0.25f, screenHeight/2 };
@@ -68,7 +68,7 @@ int main()
         BeginDrawing();
 
             ClearBackground(BLACK);
-            
+
             DrawFPS(screenWidth - 90, screenHeight - 30);
 
             // Draw created physics bodies
@@ -86,7 +86,7 @@ int main()
 
                     int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
                     Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
-                    
+
                     DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
                 }
             }
