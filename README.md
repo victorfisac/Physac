@@ -27,6 +27,7 @@ typedef struct *PhysicsBody {
     float dynamicFriction;          // Friction when the body has movement (0 to 1)
     float restitution;              // Restitution coefficient of the body (0 to 1)
     bool useGravity;                // Apply gravity force to dynamics
+    bool freezeOrient;              // Physics rotation constraint
     PhysicsShape shape;             // Physics body shape information (type, radius, vertices, normals)
 } *PhysicsBody;
 ```
@@ -91,6 +92,9 @@ int GetPhysicsShapeVerticesCount(int index);
 
 // Returns transformed position of a body shape (body position + vertex transformed position)
 Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex);
+
+// Sets physics body shape transform based on radians parameter
+void SetPhysicsBodyRotation(PhysicsBody body, float radians);
 
 // Unitializes and destroy a physics body
 void DestroyPhysicsBody(PhysicsBody body);
