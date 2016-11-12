@@ -94,7 +94,7 @@ int GetPhysicsShapeVerticesCount(int index);
 Vector2 GetPhysicsShapeVertex(PhysicsBody body, int vertex);
 
 // Sets physics body shape transform based on radians parameter
-PHYSACDEF void SetPhysicsBodyRotation(PhysicsBody body, float radians);
+void SetPhysicsBodyRotation(PhysicsBody body, float radians);
 
 // Unitializes and destroy a physics body
 void DestroyPhysicsBody(PhysicsBody body);
