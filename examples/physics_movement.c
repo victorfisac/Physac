@@ -1,6 +1,6 @@
 /*******************************************************************************************
 *
-*   Physac - Body shatter
+*   Physac - Physics movement
 *
 *   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
 *   The file pthreadGC2.dll is required to run the program; you can find it in 'src\external'
@@ -12,7 +12,9 @@
 #include "raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-#include "..\src\physac.h" 
+#include "..\src\physac.h"
+
+#define     VELOCITY    0.5f
 
 int main()
 {
@@ -22,7 +24,7 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Body shatter");
+    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics movement");
     SetTargetFPS(60);
 
     // Physac logo drawing position
@@ -31,10 +33,20 @@ int main()
 
     // Initialize physics and default physics bodies
     InitPhysics();
-    SetPhysicsGravity(0, 0);
 
-    // Create random polygon physics body to shatter
-    PhysicsBody body = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, 8), 10);
+    // Create floor and walls rectangle physics body
+    PhysicsBody floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, screenWidth, 100, 10);
+    PhysicsBody wallLeft = CreatePhysicsBodyRectangle((Vector2){ -5, screenHeight/2 }, 10, screenHeight, 10);
+    PhysicsBody wallRight = CreatePhysicsBodyRectangle((Vector2){ screenWidth + 5, screenHeight/2 }, 10, screenHeight, 10);
+
+    // Disable dynamics to floor and walls physics bodies
+    floor->enabled = false;
+    wallLeft->enabled = false;
+    wallRight->enabled = false;
+
+    // Create movement physics body
+    PhysicsBody body = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight/2 }, 50, 50, 1);
+    body->freezeOrient = true;  // Constrain body rotation to avoid little collision torque amounts
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -44,22 +56,18 @@ int main()
         //----------------------------------------------------------------------------------
         if (IsKeyPressed('R'))    // Reset physics input
         {
-            ResetPhysics();
-
-            // Create random polygon physics body to shatter
-            body = CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, 8), 10);
+            // Reset movement physics body position, velocity and rotation
+            body->position = (Vector2){ screenWidth/2, screenHeight/2 };
+            body->velocity = (Vector2){ 0, 0 };
+            SetPhysicsBodyRotation(body, 0);
         }
 
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))    // Physics shatter input
-        {
-            // Note: some values need to be stored in variables due to asynchronous changes during main thread
-            int count = GetPhysicsBodiesCount();
-            for (int i = count - 1; i >= 0; i--)
-            {
-                PhysicsBody currentBody = GetPhysicsBody(i);
-                if (currentBody != NULL) PhysicsShatter(currentBody, GetMousePosition(), 10/currentBody->inverseMass);
-            }
-        }
+        // Horizontal movement input
+        if (IsKeyDown(KEY_RIGHT)) body->velocity.x = VELOCITY;
+        else if (IsKeyDown(KEY_LEFT)) body->velocity.x = -VELOCITY;
+
+        // Vertical movement input checking if player physics body is on the floor
+        if (IsKeyDown(KEY_UP) && body->position.y + 25 >= floor->position.y - 50) body->velocity.y = -VELOCITY*4;
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -68,27 +76,30 @@ int main()
 
             ClearBackground(BLACK);
 
+            DrawFPS(screenWidth - 90, screenHeight - 30);
+
             // Draw created physics bodies
             int bodiesCount = GetPhysicsBodiesCount();
             for (int i = 0; i < bodiesCount; i++)
             {
-                PhysicsBody currentBody = GetPhysicsBody(i);
+                PhysicsBody body = GetPhysicsBody(i);
 
                 int vertexCount = GetPhysicsShapeVerticesCount(i);
                 for (int j = 0; j < vertexCount; j++)
                 {
                     // Get physics bodies shape vertices to draw lines
                     // Note: GetPhysicsShapeVertex() already calculates rotation transformations
-                    Vector2 vertexA = GetPhysicsShapeVertex(currentBody, j);
+                    Vector2 vertexA = GetPhysicsShapeVertex(body, j);
 
                     int jj = (((j + 1) < vertexCount) ? (j + 1) : 0);   // Get next vertex or first to close the shape
-                    Vector2 vertexB = GetPhysicsShapeVertex(currentBody, jj);
+                    Vector2 vertexB = GetPhysicsShapeVertex(body, jj);
 
                     DrawLineV(vertexA, vertexB, GREEN);     // Draw a line between two vertex positions
                 }
             }
 
-            DrawText("Left mouse button in polygon area to shatter body\nPress 'R' to reset example", 10, 10, 10, WHITE);
+            DrawText("Use 'ARROWS' to move player", 10, 10, 10, WHITE);
+            DrawText("Press 'R' to reset example", 10, 30, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);

@@ -1,6 +1,6 @@
 /*******************************************************************************************
 *
-*   Physac - Physics demo
+*   Physac - Physics friction
 *
 *   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
 *   The file pthreadGC2.dll is required to run the program; you can find it in 'src\external'
@@ -22,7 +22,7 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics demo");
+    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics friction");
     SetTargetFPS(60);
 
     // Physac logo drawing position
@@ -33,12 +33,31 @@ int main()
     InitPhysics();
 
     // Create floor rectangle physics body
-    PhysicsBody floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
+    PhysicsBody floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, screenWidth, 100, 10);
     floor->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    PhysicsBody wall = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight*0.8f }, 10, 80, 10);
+    wall->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
 
-    // Create obstacle circle physics body
-    PhysicsBody circle = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
-    circle->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    // Create left ramp physics body
+    PhysicsBody rectLeft = CreatePhysicsBodyRectangle((Vector2){ 25, screenHeight - 5 }, 250, 250, 10);
+    rectLeft->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    SetPhysicsBodyRotation(rectLeft, 30*DEG2RAD);
+
+    // Create right ramp  physics body
+    PhysicsBody rectRight = CreatePhysicsBodyRectangle((Vector2){ screenWidth - 25, screenHeight - 5 }, 250, 250, 10);
+    rectRight->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    SetPhysicsBodyRotation(rectRight, 330*DEG2RAD);
+
+    // Create dynamic physics bodies
+    PhysicsBody bodyA = CreatePhysicsBodyRectangle((Vector2){ 35, screenHeight*0.6f }, 40, 40, 10);
+    bodyA->staticFriction = 0.1f;
+    bodyA->dynamicFriction = 0.1f;
+    SetPhysicsBodyRotation(bodyA, 30*DEG2RAD);
+
+    PhysicsBody bodyB = CreatePhysicsBodyRectangle((Vector2){ screenWidth - 35, screenHeight*0.6f }, 40, 40, 10);
+    bodyB->staticFriction = 1;
+    bodyB->dynamicFriction = 1;
+    SetPhysicsBodyRotation(bodyB, 330*DEG2RAD);
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -48,25 +67,14 @@ int main()
         //----------------------------------------------------------------------------------
         if (IsKeyPressed('R'))    // Reset physics input
         {
-            ResetPhysics();
-
-            floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
-            floor->enabled = false;
-
-            circle = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
-            circle->enabled = false;
-        }
-
-        // Physics body creation inputs
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, 8), 10);
-        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), GetRandomValue(10, 45), 10);
-
-        // Destroy falling physics bodies
-        int bodiesCount = GetPhysicsBodiesCount();
-        for (int i = bodiesCount - 1; i >= 0; i--)
-        {
-            PhysicsBody body = GetPhysicsBody(i);
-            if (body != NULL && (body->position.y > screenHeight*2)) DestroyPhysicsBody(body);
+            // Reset dynamic physics bodies position, velocity and rotation
+            bodyA->position = (Vector2){ 35, screenHeight*0.6f };
+            bodyA->velocity = (Vector2){ 0, 0 };
+            SetPhysicsBodyRotation(bodyA, 30*DEG2RAD);
+            
+            bodyB->position = (Vector2){ screenWidth - 35, screenHeight*0.6f };
+            bodyB->velocity = (Vector2){ 0, 0 };
+            SetPhysicsBodyRotation(bodyB, 330*DEG2RAD);
         }
         //----------------------------------------------------------------------------------
 
@@ -79,7 +87,7 @@ int main()
             DrawFPS(screenWidth - 90, screenHeight - 30);
 
             // Draw created physics bodies
-            bodiesCount = GetPhysicsBodiesCount();
+            int bodiesCount = GetPhysicsBodiesCount();
             for (int i = 0; i < bodiesCount; i++)
             {
                 PhysicsBody body = GetPhysicsBody(i);
@@ -101,9 +109,11 @@ int main()
                 }
             }
 
-            DrawText("Left mouse button to create a polygon", 10, 10, 10, WHITE);
-            DrawText("Right mouse button to create a circle", 10, 25, 10, WHITE);
-            DrawText("Press 'R' to reset example", 10, 40, 10, WHITE);
+            DrawText("Friction amount", (screenWidth - MeasureText("Friction amount", 30))/2, 75, 30, WHITE);
+            DrawText("0.1", bodyA->position.x - MeasureText("0.1", 20)/2, bodyA->position.y - 7, 20, WHITE);
+            DrawText("1", bodyB->position.x - MeasureText("1", 20)/2, bodyB->position.y - 7, 20, WHITE);
+
+            DrawText("Press 'R' to reset example", 10, 10, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);
