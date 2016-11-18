@@ -161,6 +161,7 @@ typedef struct PhysicsBodyData {
     float dynamicFriction;                      // Friction when the body has movement (0 to 1)
     float restitution;                          // Restitution coefficient of the body (0 to 1)
     bool useGravity;                            // Apply gravity force to dynamics
+    bool isGrounded;                            // Physics grounded on other body state
     bool freezeOrient;                          // Physics rotation constraint
     PhysicsShape shape;                         // Physics body shape information (type, radius, vertices, normals)
 } PhysicsBodyData;
@@ -512,6 +513,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyRectangle(Vector2 pos, float width, float
         newBody->dynamicFriction = 0.2f;
         newBody->restitution = 0;
         newBody->useGravity = true;
+        newBody->isGrounded = false;
         newBody->freezeOrient = false;
 
         // Add new body to bodies pointers array and update bodies count
@@ -619,6 +621,7 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int si
         newBody->dynamicFriction = 0.2f;
         newBody->restitution = 0;
         newBody->useGravity = true;
+        newBody->isGrounded = false;
         newBody->freezeOrient = false;
 
         // Add new body to bodies pointers array and update bodies count
@@ -1340,6 +1343,9 @@ static void SolvePhysicsManifold(PhysicsManifold manifold)
         } break;
         default: break;
     }
+
+    // Update physics body grounded state if normal direction is downside
+    manifold->bodyB->isGrounded = (manifold->normal.y < 0);
 }
 
 // Solves collision between two circle shape physics bodies
@@ -1376,6 +1382,9 @@ static void SolveCircleToCircle(PhysicsManifold manifold)
         manifold->normal = (Vector2){ normal.x/distance, normal.y/distance }; // Faster than using MathNormalize() due to sqrt is already performed
         manifold->contacts[0] = (Vector2){ manifold->normal.x*bodyA->shape.radius + bodyA->position.x, manifold->normal.y*bodyA->shape.radius + bodyA->position.y };
     }
+
+    // Update physics body grounded state if normal direction is down
+    if (manifold->normal.y < 0) bodyA->isGrounded = true;
 }
 
 // Solves collision between a circle to a polygon shape physics bodies
