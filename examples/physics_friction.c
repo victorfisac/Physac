@@ -70,10 +70,12 @@ int main()
             // Reset dynamic physics bodies position, velocity and rotation
             bodyA->position = (Vector2){ 35, screenHeight*0.6f };
             bodyA->velocity = (Vector2){ 0, 0 };
+            bodyA->angularVelocity = 0;
             SetPhysicsBodyRotation(bodyA, 30*DEG2RAD);
             
             bodyB->position = (Vector2){ screenWidth - 35, screenHeight*0.6f };
             bodyB->velocity = (Vector2){ 0, 0 };
+            bodyB->angularVelocity = 0;
             SetPhysicsBodyRotation(bodyB, 330*DEG2RAD);
         }
         //----------------------------------------------------------------------------------
@@ -108,6 +110,8 @@ int main()
                     }
                 }
             }
+
+            DrawRectangle(0, screenHeight - 49, screenWidth, 49, BLACK);
 
             DrawText("Friction amount", (screenWidth - MeasureText("Friction amount", 30))/2, 75, 30, WHITE);
             DrawText("0.1", bodyA->position.x - MeasureText("0.1", 20)/2, bodyA->position.y - 7, 20, WHITE);

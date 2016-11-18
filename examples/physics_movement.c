@@ -36,11 +36,15 @@ int main()
 
     // Create floor and walls rectangle physics body
     PhysicsBody floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, screenWidth, 100, 10);
+    PhysicsBody platformLeft = CreatePhysicsBodyRectangle((Vector2){ screenWidth*0.25f, screenHeight*0.6f }, screenWidth*0.25f, 10, 10);
+    PhysicsBody platformRight = CreatePhysicsBodyRectangle((Vector2){ screenWidth*0.75f, screenHeight*0.6f }, screenWidth*0.25f, 10, 10);
     PhysicsBody wallLeft = CreatePhysicsBodyRectangle((Vector2){ -5, screenHeight/2 }, 10, screenHeight, 10);
     PhysicsBody wallRight = CreatePhysicsBodyRectangle((Vector2){ screenWidth + 5, screenHeight/2 }, 10, screenHeight, 10);
 
     // Disable dynamics to floor and walls physics bodies
     floor->enabled = false;
+    platformLeft->enabled = false;
+    platformRight->enabled = false;
     wallLeft->enabled = false;
     wallRight->enabled = false;
 
@@ -66,8 +70,8 @@ int main()
         if (IsKeyDown(KEY_RIGHT)) body->velocity.x = VELOCITY;
         else if (IsKeyDown(KEY_LEFT)) body->velocity.x = -VELOCITY;
 
-        // Vertical movement input checking if player physics body is on the floor
-        if (IsKeyDown(KEY_UP) && body->position.y + 25 >= floor->position.y - 50) body->velocity.y = -VELOCITY*4;
+        // Vertical movement input checking if player physics body is grounded
+        if (IsKeyDown(KEY_UP) && body->isGrounded) body->velocity.y = -VELOCITY*4;
         //----------------------------------------------------------------------------------
 
         // Draw
