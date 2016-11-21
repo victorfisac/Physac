@@ -27,6 +27,7 @@ typedef struct *PhysicsBody {
     float dynamicFriction;          // Friction when the body has movement (0 to 1)
     float restitution;              // Restitution coefficient of the body (0 to 1)
     bool useGravity;                // Apply gravity force to dynamics
+    bool isGrounded;                // Physics grounded on other body state
     bool freezeOrient;              // Physics rotation constraint
     PhysicsShape shape;             // Physics body shape information (type, radius, vertices, normals)
 } *PhysicsBody;
