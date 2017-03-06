@@ -15,7 +15,7 @@
 #include "raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-#include "..\src\physac.h"
+#include "../src/physac.h"
 
 int main()
 {
