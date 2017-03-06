@@ -1,11 +1,13 @@
 /**********************************************************************************************
 *
-*   Physac - 2D Physics library for videogames
+*   Physac v1.0 - 2D Physics library for videogames
 *
-*   Description: Physac is a small 2D physics engine written in pure C. The engine uses a fixed time-step thread loop 
-*   to simluate physics. A physics step contains the following phases: get collision information, apply dynamics, 
-*   collision solving and position correction. It uses a very simple struct for physic bodies with a position vector 
-*   to be used in any 3D rendering API.
+*   DESCRIPTION: 
+*
+*   Physac is a small 2D physics engine written in pure C. The engine uses a fixed time-step thread loop 
+*   to simluate physics. A physics step contains the following phases: get collision information, 
+*   apply dynamics, collision solving and position correction. It uses a very simple struct for physic 
+*   bodies with a position vector to be used in any 3D rendering API.
 * 
 *   CONFIGURATION:
 *   
@@ -36,12 +38,20 @@
 *       You can define your own malloc/free implementation replacing stdlib.h malloc()/free() functions.
 *       Otherwise it will include stdlib.h and use the C standard library malloc()/free() function.
 *
+*
+*   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
+*
+*   Use the following code to compile (-static -lpthread):
+*   gcc -o $(NAME_PART).exe $(FILE_NAME) -s $(RAYLIB_DIR)\raylib\raylib_icon -static -lraylib -lpthread 
+*   -lglfw3 -lopengl32 -lgdi32 -lopenal32 -lwinmm -std=c99 -Wl,--subsystem,windows -Wl,-allow-multiple-definition
+*
 *   VERY THANKS TO:
-*       - Ramón Santamaria (@raysan5)
+*       Ramón Santamaria (@raysan5)
+*
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2016 Victor Fisac
+*   Copyright (c) 2017 Victor Fisac
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -239,9 +249,10 @@ PHYSACDEF void ClosePhysics(void);                                              
     // Functions required to query time on Windows
     int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
     int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
-#elif defined(__linux)
+#elif defined(__linux) || defined(PLATFORM_WEB)
     #include <sys/time.h>           // Required for: timespec
     #include <time.h>               // Required for: clock_gettime()
+    #include <stdint.h>
 #endif
 
 //----------------------------------------------------------------------------------
@@ -266,7 +277,7 @@ PHYSACDEF void ClosePhysics(void);                                              
 static unsigned int usedMemory = 0;                         // Total allocated dynamic memory
 static bool physicsThreadEnabled = false;                   // Physics thread enabled state
 static double currentTime = 0;                              // Current time in milliseconds
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(__linux) || defined(PLATFORM_WEB)
     static double baseTime = 0;                             // Android and RPI platforms base time
 #endif
 static double startTime = 0;                                // Start time in milliseconds
@@ -357,70 +368,6 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyCircle(Vector2 pos, float radius, float d
 {
     PhysicsBody newBody = CreatePhysicsBodyPolygon(pos, radius, PHYSAC_CIRCLE_VERTICES, density);
     return newBody;
-
-    /*PhysicsBody newBody = (PhysicsBody)PHYSAC_MALLOC(sizeof(PhysicsBodyData));
-    usedMemory += sizeof(PhysicsBodyData);
-
-    int newId = -1;
-    for (int i = 0; i < PHYSAC_MAX_BODIES; i++)
-    {
-        int currentId = i;
-
-        // Check if current id already exist in other physics body
-        for (int k = 0; k < physicsBodiesCount; k++)
-        {
-            if (bodies[k]->id == currentId)
-            {
-                currentId++;
-                break;
-            }
-        }
-
-        // If it is not used, use it as new physics body id
-        if (currentId == i)
-        {
-            newId = i;
-            break;
-        }
-    }
-
-    if (newId != -1)
-    {
-        // Initialize new body with generic values
-        newBody->id = newId;
-        newBody->enabled = true;
-        newBody->position = pos;    
-        newBody->velocity = (Vector2){ 0 };
-        newBody->force = (Vector2){ 0 };
-        newBody->angularVelocity = 0;
-        newBody->torque = 0;
-        newBody->orient = 0;
-        newBody->mass = PHYSAC_PI*radius*radius*density;
-        newBody->inverseMass = ((newBody->mass != 0.0f) ? 1.0f/newBody->mass : 0.0f);
-        newBody->inertia = newBody->mass*radius*radius;
-        newBody->inverseInertia = ((newBody->inertia != 0.0f) ? 1.0f/newBody->inertia : 0.0f);
-        newBody->staticFriction = 0;
-        newBody->dynamicFriction = 0;
-        newBody->restitution = 0;
-        newBody->useGravity = true;
-        newBody->freezeOrient = false;
-        newBody->shape.type = PHYSICS_CIRCLE;
-        newBody->shape.body = newBody;
-        newBody->shape.radius = radius;
-
-        // Add new body to bodies pointers array and update bodies count
-        bodies[physicsBodiesCount] = newBody;
-        physicsBodiesCount++;
-
-        #if defined(PHYSAC_DEBUG)
-            printf("[PHYSAC] created circle physics body id %i\n", newBody->id);
-        #endif
-    }
-    #if defined(PHYSAC_DEBUG)
-        else printf("[PHYSAC] new physics body creation failed because there is any available id to use\n");
-    #endif
-
-    return newBody;*/
 }
 
 // Creates a new rectangle physics body with generic parameters
@@ -1126,6 +1073,7 @@ static void *PhysicsLoop(void *arg)
 // Physics steps calculations (dynamics, collisions and position corrections)
 static void PhysicsStep(void)
 {
+    // Update current steps count
     stepsCount++;
 
     // Clear previous generated collisions information
@@ -1133,6 +1081,13 @@ static void PhysicsStep(void)
     {
         PhysicsManifold manifold = contacts[i];
         if (manifold != NULL) DestroyPhysicsManifold(manifold);
+    }
+    
+    // Reset physics bodies grounded state
+    for (int i = 0; i < physicsBodiesCount; i++)
+    {
+        PhysicsBody body = bodies[i];
+        body->isGrounded = false;
     }
 
     // Generate new collision information
@@ -1343,9 +1298,9 @@ static void SolvePhysicsManifold(PhysicsManifold manifold)
         } break;
         default: break;
     }
-
-    // Update physics body grounded state if normal direction is downside
-    manifold->bodyB->isGrounded = (manifold->normal.y < 0);
+    
+    // Update physics body grounded state if normal direction is down and grounded state is not set yet in previous manifolds
+    if (!manifold->bodyB->isGrounded) manifold->bodyB->isGrounded = (manifold->normal.y < 0);
 }
 
 // Solves collision between two circle shape physics bodies
@@ -1384,7 +1339,7 @@ static void SolveCircleToCircle(PhysicsManifold manifold)
     }
 
     // Update physics body grounded state if normal direction is down
-    if (manifold->normal.y < 0) bodyA->isGrounded = true;
+    if (!bodyA->isGrounded) bodyA->isGrounded = (manifold->normal.y < 0);
 }
 
 // Solves collision between a circle to a polygon shape physics bodies
@@ -1942,7 +1897,7 @@ static double GetCurrentTime(void)
 {
     double time = 0;
 
-    #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+    #if defined(_WIN32)
         unsigned long long int clockFrequency, currentTime;
 
         QueryPerformanceFrequency(&clockFrequency);
@@ -1951,7 +1906,7 @@ static double GetCurrentTime(void)
         time = (double)((double)currentTime/clockFrequency)*1000;
     #endif
 
-    #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
+    #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(__linux) || defined(PLATFORM_WEB)
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
         uint64_t temp = (uint64_t)ts.tv_sec*1000000000LLU + (uint64_t)ts.tv_nsec;
