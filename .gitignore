@@ -33,6 +33,14 @@
 # Operating System Files
 # =========================
 
+# Linux
+# =========================
+
+# Vim temporary files
+*.~
+*.swp
+*.swo
+
 # OSX
 # =========================
 
