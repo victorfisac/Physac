@@ -2,17 +2,11 @@
 *
 *   Physac - Physics demo
 *
-<<<<<<< HEAD
-*   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
-*
-*   Use the following code to compile (-static -lpthread):
-=======
 *   NOTE 1: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
 *   NOTE 2: Physac requires static C library linkage to avoid dependency on MinGW DLL (-static -lpthread)
 *
 *   Use the following line to compile:
 *
->>>>>>> refs/heads/pr/24
 *   gcc -o $(NAME_PART).exe $(FILE_NAME) -s $(RAYLIB_DIR)\raylib\raylib_icon -static -lraylib -lpthread 
 *   -lglfw3 -lopengl32 -lgdi32 -lopenal32 -lwinmm -std=c99 -Wl,--subsystem,windows -Wl,-allow-multiple-definition
 *   
@@ -23,11 +17,7 @@
 #include "raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-<<<<<<< HEAD
-#include "../src/physac.h"
-=======
 #include "physac.h"
->>>>>>> refs/heads/pr/24
 
 int main()
 {

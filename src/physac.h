@@ -39,18 +39,11 @@
 *       Otherwise it will include stdlib.h and use the C standard library malloc()/free() function.
 *
 *
-<<<<<<< HEAD
-*   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
-*
-*   Use the following code to compile (-static -lpthread):
-*   gcc -o $(NAME_PART).exe $(FILE_NAME) -s $(RAYLIB_DIR)\raylib\raylib_icon -static -lraylib -lpthread
-=======
 *   NOTE 1: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
 *   NOTE 2: Physac requires static C library linkage to avoid dependency on MinGW DLL (-static -lpthread)
 *
 *   Use the following code to compile:
 *   gcc -o physac_sample.exe physac_sample.c -s $(RAYLIB_DIR)\raylib\raylib_icon -static -lraylib -lpthread \
->>>>>>> refs/heads/pr/24
 *   -lglfw3 -lopengl32 -lgdi32 -lopenal32 -lwinmm -std=c99 -Wl,--subsystem,windows -Wl,-allow-multiple-definition
 *
 *   VERY THANKS TO:
@@ -59,11 +52,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-<<<<<<< HEAD
-*   Copyright (c) 2017 Victor Fisac
-=======
 *   Copyright (c) 2016-2017 Victor Fisac
->>>>>>> refs/heads/pr/24
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
