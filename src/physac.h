@@ -39,10 +39,11 @@
 *       Otherwise it will include stdlib.h and use the C standard library malloc()/free() function.
 *
 *
-*   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
+*   NOTE 1: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
+*   NOTE 2: Physac requires static C library linkage to avoid dependency on MinGW DLL (-static -lpthread)
 *
-*   Use the following code to compile (-static -lpthread):
-*   gcc -o $(NAME_PART).exe $(FILE_NAME) -s $(RAYLIB_DIR)\raylib\raylib_icon -static -lraylib -lpthread
+*   Use the following code to compile:
+*   gcc -o physac_sample.exe physac_sample.c -s $(RAYLIB_DIR)\raylib\raylib_icon -static -lraylib -lpthread \
 *   -lglfw3 -lopengl32 -lgdi32 -lopenal32 -lwinmm -std=c99 -Wl,--subsystem,windows -Wl,-allow-multiple-definition
 *
 *   VERY THANKS TO:
@@ -51,7 +52,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2017 Victor Fisac
+*   Copyright (c) 2016-2017 Victor Fisac
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -73,7 +74,7 @@
 #if !defined(PHYSAC_H)
 #define PHYSAC_H
 
-#define PHYSAC_STATIC
+// #define PHYSAC_STATIC
 // #define  PHYSAC_NO_THREADS
 // #define  PHYSAC_STANDALONE
 // #define  PHYSAC_DEBUG
@@ -746,82 +747,74 @@ PHYSACDEF int GetPhysicsBodiesCount(void)
 // Returns a physics body of the bodies pool at a specific index
 PHYSACDEF PhysicsBody GetPhysicsBody(int index)
 {
+    PhysicsBody body = NULL;
+    
     if (index < physicsBodiesCount)
     {
-        PhysicsBody body = bodies[index];
-        if (body != NULL) return body;
-        else
+        body = bodies[index];
+        
+        if (body == NULL)
         {
             #if defined(PHYSAC_DEBUG)
                 printf("[PHYSAC] error when trying to get a null reference physics body");
             #endif
-
-            return NULL;
         }
     }
     #if defined(PHYSAC_DEBUG)
-    else
-    {
-        printf("[PHYSAC] physics body index is out of bounds");
-        return NULL;
-    }
+    else printf("[PHYSAC] physics body index is out of bounds");
     #endif
+    
+    return body;
 }
 
 // Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON)
 PHYSACDEF int GetPhysicsShapeType(int index)
 {
+    int result = -1;
+    
     if (index < physicsBodiesCount)
     {
         PhysicsBody body = bodies[index];
-        if (body != NULL) return body->shape.type;
+        
+        if (body != NULL) result = body->shape.type;
         #if defined(PHYSAC_DEBUG)
-        else
-        {
-            printf("[PHYSAC] error when trying to get a null reference physics body");
-            return -1;
-        }
+        else printf("[PHYSAC] error when trying to get a null reference physics body");
         #endif
     }
     #if defined(PHYSAC_DEBUG)
-    else
-    {
-        printf("[PHYSAC] physics body index is out of bounds");
-        return -1;
-    }
+    else printf("[PHYSAC] physics body index is out of bounds");
     #endif
+    
+    return result;
 }
 
 // Returns the amount of vertices of a physics body shape
 PHYSACDEF int GetPhysicsShapeVerticesCount(int index)
 {
+    int result = 0;
+    
     if (index < physicsBodiesCount)
     {
         PhysicsBody body = bodies[index];
+        
         if (body != NULL)
         {
             switch (body->shape.type)
             {
-                case PHYSICS_CIRCLE: return PHYSAC_CIRCLE_VERTICES; break;
-                case PHYSICS_POLYGON: return body->shape.vertexData.vertexCount; break;
+                case PHYSICS_CIRCLE: result = PHYSAC_CIRCLE_VERTICES; break;
+                case PHYSICS_POLYGON: result = body->shape.vertexData.vertexCount; break;
                 default: break;
             }
         }
         #if defined(PHYSAC_DEBUG)
-        else
-        {
-            printf("[PHYSAC] error when trying to get a null reference physics body");
-            return 0;
-        }
+        else printf("[PHYSAC] error when trying to get a null reference physics body");
         #endif
     }
     #if defined(PHYSAC_DEBUG)
-    else
-    {
-        printf("[PHYSAC] physics body index is out of bounds");
-        return 0;
-    }
+    else printf("[PHYSAC] physics body index is out of bounds");
     #endif
+    
+    return result;
 }
 
 // Returns transformed position of a body shape (body position + vertex transformed position)
