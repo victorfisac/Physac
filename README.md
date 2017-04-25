@@ -1,3 +1,5 @@
+<img src="https://github.com/victorfisac/Physac/blob/master/src/icon/physac.png">
+
 # Physac
 _Created by Víctor Fisac [www.victorfisac.com]_
 
