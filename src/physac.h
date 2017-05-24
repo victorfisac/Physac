@@ -246,12 +246,16 @@ PHYSACDEF void ClosePhysics(void);                                              
 #include <stdlib.h>                 // Required for: malloc(), free(), srand(), rand()
 #include <math.h>                   // Required for: cosf(), sinf(), fabs(), sqrtf()
 
+#if !defined(PHYSAC_STANDALONE)
+    #include "raymath.h"                // Required for: Vector2Add(), Vector2Subtract()
+#endif
+
 #if defined(_WIN32)
     // Functions required to query time on Windows
     int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
     int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
 #elif defined(__linux__) || defined(PLATFORM_WEB)
-    #define _DEFAULT_SOURCE         // Enables BSD function definitions and C99 POSIX compliance
+    //#define _DEFAULT_SOURCE         // Enables BSD function definitions and C99 POSIX compliance
     #include <sys/time.h>           // Required for: timespec
     #include <time.h>               // Required for: clock_gettime()
     #include <stdint.h>
@@ -329,13 +333,15 @@ static float MathLenSqr(Vector2 vector);                                        
 static float MathDot(Vector2 v1, Vector2 v2);                                                               // Returns the dot product of two vectors
 static inline float DistSqr(Vector2 v1, Vector2 v2);                                                        // Returns the square root of distance between two vectors
 static void MathNormalize(Vector2 *vector);                                                                 // Returns the normalized values of a vector
+#if defined(PHYSAC_STANDALONE)
 static Vector2 Vector2Add(Vector2 v1, Vector2 v2);                                                          // Returns the sum of two given vectors
 static Vector2 Vector2Subtract(Vector2 v1, Vector2 v2);                                                     // Returns the subtract of two given vectors
+#endif
 
-static Mat2 Mat2Radians(float radians);                                                                     // Creates a matrix 2x2 from a given radians value
+static inline Mat2 Mat2Radians(float radians);                                                              // Creates a matrix 2x2 from a given radians value
 static void Mat2Set(Mat2 *matrix, float radians);                                                           // Set values from radians to a created matrix 2x2
-static Mat2 Mat2Transpose(Mat2 matrix);                                                                     // Returns the transpose of a given matrix 2x2
-static Vector2 Mat2MultiplyVector2(Mat2 matrix, Vector2 vector);                                            // Multiplies a vector by a matrix 2x2
+static inline Mat2 Mat2Transpose(Mat2 matrix);                                                              // Returns the transpose of a given matrix 2x2
+static inline Vector2 Mat2MultiplyVector2(Mat2 matrix, Vector2 vector);                                     // Multiplies a vector by a matrix 2x2
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -1980,6 +1986,7 @@ static void MathNormalize(Vector2 *vector)
     vector->y *= ilength;
 }
 
+#if defined(PHYSAC_STANDALONE)
 // Returns the sum of two given vectors
 static inline Vector2 Vector2Add(Vector2 v1, Vector2 v2)
 {
@@ -1991,6 +1998,7 @@ static inline Vector2 Vector2Subtract(Vector2 v1, Vector2 v2)
 {
     return (Vector2){ v1.x - v2.x, v1.y - v2.y };
 }
+#endif
 
 // Creates a matrix 2x2 from a given radians value
 static inline Mat2 Mat2Radians(float radians)
