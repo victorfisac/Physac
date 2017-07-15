@@ -247,7 +247,7 @@ PHYSACDEF void ClosePhysics(void);                                              
 #include <math.h>                   // Required for: cosf(), sinf(), fabs(), sqrtf()
 
 #if !defined(PHYSAC_STANDALONE)
-    #include "raymath.h"                // Required for: Vector2Add(), Vector2Subtract()
+    #include "external/raylib/src/raymath.h"    // Required for: Vector2Add(), Vector2Subtract()
 #endif
 
 #if defined(_WIN32)
