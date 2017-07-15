@@ -10,6 +10,16 @@ The header file includes some tweakable define values to fit the results that th
 
 _Note: The example code uses raylib programming library to create the program window and rendering framework._
 
+Installation
+-----
+
+rPBR requires raylib submodule. To add them to the repository we need to use the following commands using Git Shell:
+
+    * cd src/external/raylib
+    * git submodule update --init --recursive
+
+It will install the raylib submodule. Ensure to be in master branch to work with a stable version of raylib.
+
 Physac API
 -----
 
