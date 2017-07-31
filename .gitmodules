@@ -1,3 +1,0 @@
-[submodule "src/external/raylib"]
-	path = src/external/raylib
-	url = https://github.com/raysan5/raylib.git
