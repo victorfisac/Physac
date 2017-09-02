@@ -14,7 +14,7 @@
 *
 ********************************************************************************************/
 
-#include "external\raylib\src\raylib.h"
+#include "external/raylib/src/raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
 #include "physac.h"
