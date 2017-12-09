@@ -254,11 +254,18 @@ PHYSACDEF void ClosePhysics(void);                                              
     // Functions required to query time on Windows
     int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
     int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
-#elif defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(__linux__) || defined(PLATFORM_WEB) || defined(__APPLE__)
-    //#define _DEFAULT_SOURCE         // Enables BSD function definitions and C99 POSIX compliance
+#elif defined(__linux__)
+    #if _POSIX_C_SOURCE < 199309L
+        #undef _POSIX_C_SOURCE
+        #define _POSIX_C_SOURCE 199309L // Required for CLOCK_MONOTONIC if compiled with c99 without gnu ext.
+    #endif
     #include <sys/time.h>           // Required for: timespec
     #include <time.h>               // Required for: clock_gettime()
-    #include <stdint.h>
+    #include <math.h>               // Required for: atan2(), sqrt()
+    #include <stdint.h>             // Required for: uint64_t
+#elif defined(__APPLE__)        // macOS also defines __MACH__
+    #include <mach/clock.h>         // Required for: clock_get_time()
+    #include <mach/mach.h>          // Required for: mach_timespec_t
 #endif
 
 //----------------------------------------------------------------------------------
@@ -283,9 +290,6 @@ static pthread_t physicsThreadId;                           // Physics thread id
 static unsigned int usedMemory = 0;                         // Total allocated dynamic memory
 static bool physicsThreadEnabled = false;                   // Physics thread enabled state
 static double currentTime = 0;                              // Current time in milliseconds
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(__linux__) || defined(PLATFORM_WEB) || defined(__APPLE__)
-static double baseTime = 0;                                 // Android and RPI platforms base time
-#endif
 static double startTime = 0;                                // Start time in milliseconds
 static double deltaTime = 0;                                // Delta time used for physics steps
 static double accumulator = 0;                              // Physics time step delta time accumulator
@@ -1021,7 +1025,7 @@ static PolygonData CreateRectanglePolygon(Vector2 pos, Vector2 size)
 static void *PhysicsLoop(void *arg)
 {
     #if defined(PHYSAC_DEBUG)
-        printf("[PHYSAC] physics thread created with successfully\n");
+        printf("[PHYSAC] physics thread created successfully\n");
     #endif
 
     // Initialize physics loop thread values
@@ -1884,14 +1888,9 @@ static Vector2 TriangleBarycenter(Vector2 v1, Vector2 v2, Vector2 v3)
 // Initializes hi-resolution timer
 static void InitTimer(void)
 {
-    srand(time(NULL));              // Initialize random seed
-
-    #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
-        struct timespec now;
-        if (clock_gettime(CLOCK_MONOTONIC, &now) == 0) baseTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;
-    #endif
-
-    startTime = GetCurrentTime();
+    srand(time(NULL));                  // Initialize random seed
+    
+    startTime = GetCurrentTime();       // Get current time
 }
 
 // Get current time in milliseconds
@@ -1899,22 +1898,39 @@ static double GetCurrentTime(void)
 {
     double time = 0;
 
-    #if defined(_WIN32)
-        unsigned long long int clockFrequency, currentTime;
+#if defined(_WIN32)
+    unsigned long long int clockFrequency, currentTime;
+    
+    QueryPerformanceFrequency(&clockFrequency);
+    QueryPerformanceCounter(&currentTime);
+    
+    time = (double)currentTime/clockFrequency*1000.0f;  // Time in miliseconds
+#endif
 
-        QueryPerformanceFrequency(&clockFrequency);
-        QueryPerformanceCounter(&currentTime);
+#if defined(__linux__)
+    // NOTE: Only for Linux-based systems
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t nowTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;     // Time in nanoseconds
+    
+    time = ((double)nowTime/1000000.0);     // Time in miliseconds
+#endif
 
-        time = (double)((double)currentTime/clockFrequency)*1000;
-    #endif
+#if defined(__APPLE__)
+    //#define CLOCK_REALTIME  CALENDAR_CLOCK
+    //#define CLOCK_MONOTONIC SYSTEM_CLOCK
+    
+    clock_serv_t cclock;
+    mach_timespec_t now;
+    host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
+    
+    // NOTE: OS X does not have clock_gettime(), using clock_get_time()
+    clock_get_time(cclock, &now);
+    mach_port_deallocate(mach_task_self(), cclock);
+    uint64_t nowTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;     // Time in nanoseconds
 
-    #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(__linux__) || defined(PLATFORM_WEB) || defined(__APPLE__)
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        uint64_t temp = (uint64_t)ts.tv_sec*1000000000LLU + (uint64_t)ts.tv_nsec;
-
-        time = (double)((double)(temp - baseTime)*1e-6);
-    #endif
+    time = ((double)nowTime/1000000.0);     // Time in miliseconds    
+#endif
 
     return time;
 }
