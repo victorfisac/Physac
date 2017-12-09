@@ -2,17 +2,22 @@
 *
 *   Physac - Physics demo
 *
-*   NOTE: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
-*   The file pthreadGC2.dll is required to run the program; you can find it in 'src\external'
+*   NOTE 1: Physac requires multi-threading, when InitPhysics() a second thread is created to manage physics calculations.
+*   NOTE 2: Physac requires static C library linkage to avoid dependency on MinGW DLL (-static -lpthread)
 *
-*   Copyright (c) 2016 Victor Fisac
+*   Use the following line to compile:
+*
+*   gcc -o $(NAME_PART).exe $(FILE_NAME) -s icon\physac_icon -static -lraylib -lpthread -lglfw3 -lopengl32
+*   -lgdi32 -lopenal32 -lwinmm -std=c99 -Wl,--subsystem,windows -Wl,-allow-multiple-definition
+*   
+*   Copyright (c) 2017 Victor Fisac
 *
 ********************************************************************************************/
 
-#include "raylib.h"
+#include "external/raylib/src/raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-#include "..\src\physac.h"
+#include "physac.h"
 
 int main()
 {
@@ -23,7 +28,6 @@ int main()
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics demo");
-    SetTargetFPS(60);
 
     // Physac logo drawing position
     int logoX = screenWidth - MeasureText("Physac", 30) - 10;
@@ -39,6 +43,8 @@ int main()
     // Create obstacle circle physics body
     PhysicsBody circle = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
     circle->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
+    
+    SetTargetFPS(60);
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -115,8 +121,10 @@ int main()
     // De-Initialization
     //--------------------------------------------------------------------------------------   
     ClosePhysics();       // Unitialize physics
+    
     CloseWindow();        // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
     return 0;
 }
+
