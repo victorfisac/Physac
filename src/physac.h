@@ -43,16 +43,15 @@
 *   NOTE 2: Physac requires static C library linkage to avoid dependency on MinGW DLL (-static -lpthread)
 *
 *   Use the following code to compile:
-*   gcc -o $(NAME_PART).exe $(FILE_NAME) -s icon\physac_icon -static -lraylib -lpthread -lglfw3 -lopengl32
-*   -lgdi32 -lopenal32 -lwinmm -std=c99 -Wl,--subsystem,windows -Wl,-allow-multiple-definition
+*   gcc -o $(NAME_PART).exe $(FILE_NAME) -s icon\physac_icon -static -lraylib -lpthread -lopengl32 -lgdi32 -std=c99
 *
 *   VERY THANKS TO:
-*       Ramón Santamaria (@raysan5)
+*       Ramon Santamaria (github: @raysan5)
 *
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2016-2017 Victor Fisac
+*   Copyright (c) 2016-2017 Victor Fisac (github: @victorfisac)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -245,11 +244,13 @@ PHYSACDEF void ClosePhysics(void);                                              
 
 #include <stdlib.h>                 // Required for: malloc(), free(), srand(), rand()
 #include <math.h>                   // Required for: cosf(), sinf(), fabs(), sqrtf()
+#include <stdint.h>                 // Required for: uint64_t
 
 #if !defined(PHYSAC_STANDALONE)
-    #include "external/raylib/src/raymath.h"    // Required for: Vector2Add(), Vector2Subtract()
+    #include "raymath.h"            // Required for: Vector2Add(), Vector2Subtract()
 #endif
 
+// Time management functionality
 #if defined(_WIN32)
     // Functions required to query time on Windows
     int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
@@ -261,11 +262,8 @@ PHYSACDEF void ClosePhysics(void);                                              
     #endif
     #include <sys/time.h>           // Required for: timespec
     #include <time.h>               // Required for: clock_gettime()
-    #include <math.h>               // Required for: atan2(), sqrt()
-    #include <stdint.h>             // Required for: uint64_t
 #elif defined(__APPLE__)        // macOS also defines __MACH__
-    #include <mach/clock.h>         // Required for: clock_get_time()
-    #include <mach/mach.h>          // Required for: mach_timespec_t
+    #include <mach/mach_time.h>     // Required for: mach_absolute_time()
 #endif
 
 //----------------------------------------------------------------------------------
@@ -289,9 +287,13 @@ static pthread_t physicsThreadId;                           // Physics thread id
 #endif
 static unsigned int usedMemory = 0;                         // Total allocated dynamic memory
 static bool physicsThreadEnabled = false;                   // Physics thread enabled state
-static double currentTime = 0;                              // Current time in milliseconds
+
+static double baseTime = 0;                                 // Offset time for MONOTONIC clock
 static double startTime = 0;                                // Start time in milliseconds
 static double deltaTime = 0;                                // Delta time used for physics steps
+static double currentTime = 0;                              // Current time in milliseconds
+static uint64_t frequency = 0.0;                            // Hi-res clock frequency
+
 static double accumulator = 0;                              // Physics time step delta time accumulator
 static unsigned int stepsCount = 0;                         // Total physics steps processed
 static Vector2 gravityForce = { 0, 9.81f/1000 };            // Physics world gravity force
@@ -325,8 +327,10 @@ static int Clip(Vector2 normal, float clip, Vector2 *faceA, Vector2 *faceB);    
 static bool BiasGreaterThan(float valueA, float valueB);                                                    // Check if values are between bias range
 static Vector2 TriangleBarycenter(Vector2 v1, Vector2 v2, Vector2 v3);                                      // Returns the barycenter of a triangle given by 3 points
 
-static void InitTimer(void);                                                                                // Initializes hi-resolution timer
-static double GetCurrentTime(void);                                                                         // Get current time in milliseconds
+static void InitTimer(void);                                                                                // Initializes hi-resolution MONOTONIC timer
+static uint64_t GetTimeCount(void);                                                                         // Get hi-res MONOTONIC time measure in seconds
+static double GetCurrentTime(void);                                                                         // // Get hi-res MONOTONIC time measure in seconds
+
 static int GetRandomNumber(int min, int max);                                                               // Returns a random number between min and max (both included)
 
 // Math functions
@@ -353,14 +357,14 @@ static inline Vector2 Mat2MultiplyVector2(Mat2 matrix, Vector2 vector);         
 // Initializes physics values, pointers and creates physics loop thread
 PHYSACDEF void InitPhysics(void)
 {
-    #if defined(PHYSAC_DEBUG)
-        printf("[PHYSAC] physics module initialized successfully\n");
-    #endif
-
     #if !defined(PHYSAC_NO_THREADS)
         // NOTE: if defined, user will need to create a thread for PhysicsThread function manually
         // Create physics thread using POSIXS thread libraries
         pthread_create(&physicsThreadId, NULL, &PhysicsLoop, NULL);
+    #endif
+    
+    #if defined(PHYSAC_DEBUG)
+        printf("[PHYSAC] physics module initialized successfully\n");
     #endif
 }
 
@@ -1885,54 +1889,56 @@ static Vector2 TriangleBarycenter(Vector2 v1, Vector2 v2, Vector2 v3)
     return result;
 }
 
-// Initializes hi-resolution timer
+// Initializes hi-resolution MONOTONIC timer
 static void InitTimer(void)
 {
-    srand(time(NULL));                  // Initialize random seed
+    srand(time(NULL));              // Initialize random seed
     
-    startTime = GetCurrentTime();       // Get current time
+#if defined(_WIN32)
+    QueryPerformanceFrequency((unsigned long long int *) &frequency);
+#endif
+
+#if defined(__linux__)
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) == 0) frequency = 1000000000;
+#endif
+
+#if defined(__APPLE__)
+    mach_timebase_info_data_t timebase;
+    mach_timebase_info(&timebase);
+    frequency = (timebase.denom*1e9)/timebase.numer;
+#endif
+    
+    baseTime = GetTimeCount();      // Get MONOTONIC clock time offset
+    startTime = GetCurrentTime();   // Get current time
+}
+
+// Get hi-res MONOTONIC time measure in seconds
+static uint64_t GetTimeCount(void)
+{
+    uint64_t value;
+    
+#if defined(_WIN32)
+    QueryPerformanceCounter((unsigned long long int *) &value);
+#endif
+
+#if defined(__linux__)
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    value = (uint64_t)now.tv_sec*(uint64_t)1000000000 + (uint64_t)now.tv_nsec;
+#endif
+
+#if defined(__APPLE__)
+    value = mach_absolute_time();
+#endif
+
+    return value;
 }
 
 // Get current time in milliseconds
 static double GetCurrentTime(void)
 {
-    double time = 0;
-
-#if defined(_WIN32)
-    unsigned long long int clockFrequency, currentTime;
-    
-    QueryPerformanceFrequency(&clockFrequency);
-    QueryPerformanceCounter(&currentTime);
-    
-    time = (double)currentTime/clockFrequency*1000.0f;  // Time in miliseconds
-#endif
-
-#if defined(__linux__)
-    // NOTE: Only for Linux-based systems
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    uint64_t nowTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;     // Time in nanoseconds
-    
-    time = ((double)nowTime/1000000.0);     // Time in miliseconds
-#endif
-
-#if defined(__APPLE__)
-    //#define CLOCK_REALTIME  CALENDAR_CLOCK
-    //#define CLOCK_MONOTONIC SYSTEM_CLOCK
-    
-    clock_serv_t cclock;
-    mach_timespec_t now;
-    host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
-    
-    // NOTE: OS X does not have clock_gettime(), using clock_get_time()
-    clock_get_time(cclock, &now);
-    mach_port_deallocate(mach_task_self(), cclock);
-    uint64_t nowTime = (uint64_t)now.tv_sec*1000000000LLU + (uint64_t)now.tv_nsec;     // Time in nanoseconds
-
-    time = ((double)nowTime/1000000.0);     // Time in miliseconds    
-#endif
-
-    return time;
+    return (double)(GetTimeCount() - baseTime)/frequency*1000;
 }
 
 // Returns a random number between min and max (both included)
