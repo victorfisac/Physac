@@ -1,20 +1,25 @@
-1 ICON physac.ico
-2 VERSIONINFO
+GLFW_ICON ICON "physac.ico"
+
+1 VERSIONINFO
 FILEVERSION     1,0,0,0
 PRODUCTVERSION  1,0,0,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
-    BLOCK "080904E4"
+    BLOCK "040904E4"
     BEGIN
       VALUE "CompanyName", "Victor Fisac Fuentes"
       VALUE "FileDescription", "Physac - 2D physics header-only library for videogames"
       VALUE "FileVersion", "1.0"
       VALUE "InternalName", "physac"
-      VALUE "LegalCopyright", "Victor Fisac, 2017. All rights reserved."
+      VALUE "LegalCopyright", "(c) 2017 Victor Fisac. All rights reserved."
       VALUE "OriginalFilename", "physac.exe"
-      VALUE "ProductName", "Physac"
+      VALUE "ProductName", "Physac app"
       VALUE "ProductVersion", "1.0"
     END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1252	// English US
   END
 END
