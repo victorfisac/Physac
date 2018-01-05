@@ -268,6 +268,7 @@ PHYSACDEF void ClosePhysics(void);                                              
 #define     PHYSAC_FLT_MAX              3.402823466e+38f
 #define     PHYSAC_EPSILON              0.000001f
 #define     PHYSAC_K                    1.0f/3.0f
+#define     PHYSAC_VECTOR_ZERO          (Vector2){ 0.0f, 0.0f }
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
@@ -480,8 +481,8 @@ PHYSACDEF PhysicsBody CreatePhysicsBodyPolygon(Vector2 pos, float radius, int si
         newBody->id = newId;
         newBody->enabled = true;
         newBody->position = pos;
-        newBody->velocity = (Vector2){ 0.0f, 0.0f };
-        newBody->force = (Vector2){ 0.0f, 0.0f };
+        newBody->velocity = PHYSAC_VECTOR_ZERO;
+        newBody->force = PHYSAC_VECTOR_ZERO;
         newBody->angularVelocity = 0.0f;
         newBody->torque = 0.0f;
         newBody->orient = 0.0f;
@@ -612,7 +613,7 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
                 for (int i = 0; i < count; i++)
                 {
                     int nextIndex = (((i + 1) < count) ? (i + 1) : 0);
-                    Vector2 center = TriangleBarycenter(vertices[i], vertices[nextIndex], (Vector2){ 0, 0 });
+                    Vector2 center = TriangleBarycenter(vertices[i], vertices[nextIndex], PHYSAC_VECTOR_ZERO);
                     center = Vector2Add(bodyPos, center);
                     Vector2 offset = Vector2Subtract(center, bodyPos);
 
@@ -648,7 +649,7 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
                     newBody->shape.transform = trans;
 
                     // Calculate centroid and moment of inertia
-                    center = (Vector2){ 0.0f, 0.0f };
+                    center = PHYSAC_VECTOR_ZERO;
                     float area = 0.0f;
                     float inertia = 0.0f;
 
@@ -1153,7 +1154,7 @@ static void PhysicsStep(void)
         PhysicsBody body = bodies[i];
         if (body != NULL)
         {
-            body->force = (Vector2){ 0.0f, 0.0f };
+            body->force = PHYSAC_VECTOR_ZERO;
             body->torque = 0.0f;
         }
     }
@@ -1202,9 +1203,9 @@ static PhysicsManifold CreatePhysicsManifold(PhysicsBody a, PhysicsBody b)
         newManifold->bodyA = a;
         newManifold->bodyB = b;
         newManifold->penetration = 0;
-        newManifold->normal = (Vector2){ 0.0f, 0.0f };
-        newManifold->contacts[0] = (Vector2){ 0.0f, 0.0f };
-        newManifold->contacts[1] = (Vector2){ 0 };
+        newManifold->normal = PHYSAC_VECTOR_ZERO;
+        newManifold->contacts[0] = PHYSAC_VECTOR_ZERO;
+        newManifold->contacts[1] = PHYSAC_VECTOR_ZERO;
         newManifold->contactsCount = 0;
         newManifold->restitution = 0.0f;
         newManifold->dynamicFriction = 0.0f;
@@ -1588,8 +1589,8 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
     // Early out and positional correct if both objects have infinite mass
     if (fabs(bodyA->inverseMass + bodyB->inverseMass) <= PHYSAC_EPSILON)
     {
-        bodyA->velocity = (Vector2){ 0.0f, 0.0f };
-        bodyB->velocity = (Vector2){ 0.0f, 0.0f };
+        bodyA->velocity = PHYSAC_VECTOR_ZERO;
+        bodyB->velocity = PHYSAC_VECTOR_ZERO;
         return;
     }
 
