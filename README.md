@@ -1,4 +1,4 @@
-<img src="https://github.com/victorfisac/Physac/blob/master/icon/physac.png">
+<img src="https://github.com/victorfisac/Physac/blob/master/icon/physac_256x256.png">
 
 # Physac
 _Created by Víctor Fisac [www.victorfisac.com]_
