@@ -844,7 +844,7 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
         #endif
 
         // Free body allocated memory
-        PHYSAC_FREE(bodies[index]);
+        PHYSAC_FREE(body);
         usedMemory -= sizeof(PhysicsBodyData);
         bodies[index] = NULL;
 
@@ -1244,7 +1244,7 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
         #endif
 
         // Free manifold allocated memory
-        PHYSAC_FREE(contacts[index]);
+        PHYSAC_FREE(manifold);
         usedMemory -= sizeof(PhysicsManifoldData);
         contacts[index] = NULL;
 
@@ -1585,6 +1585,9 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 {
     PhysicsBody bodyA = manifold->bodyA;
     PhysicsBody bodyB = manifold->bodyB;
+
+    if ((bodyA == NULL) || (bodyB == NULL))
+        return;
 
     // Early out and positional correct if both objects have infinite mass
     if (fabs(bodyA->inverseMass + bodyB->inverseMass) <= PHYSAC_EPSILON)
