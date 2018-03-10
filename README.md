@@ -13,12 +13,11 @@ _Note: The example code uses raylib programming library to create the program wi
 Installation
 -----
 
-rPBR requires raylib submodule. To add them to the repository we need to use the following commands using Git Shell:
+rPBR requires raylib. To get it, follow the next steps:
 
-    * cd src/external/raylib
-    * git submodule update --init --recursive
-
-It will install the raylib submodule. Ensure to be in master branch to work with a stable version of raylib.
+    * Go to [raylib](https://www.github.com/raysan5/raylib) and clone the repository.
+    * Ensure to pull the last changes of 'master' branch.
+    * Use code inside examples header comments to compile and execute.
 
 Physac API
 -----
