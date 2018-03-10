@@ -249,6 +249,7 @@ PHYSACDEF void ClosePhysics(void);                                              
     // Functions required to query time on Windows
     int __stdcall QueryPerformanceCounter(unsigned long long int *lpPerformanceCount);
     int __stdcall QueryPerformanceFrequency(unsigned long long int *lpFrequency);
+    #include <time.h>
 #elif defined(__linux__)
     #if _POSIX_C_SOURCE < 199309L
         #undef _POSIX_C_SOURCE
@@ -840,7 +841,7 @@ PHYSACDEF void DestroyPhysicsBody(PhysicsBody body)
         }
 
         #if defined(PHYSAC_DEBUG)
-            if (index == -1) printf("[PHYSAC] cannot find body id %i in pointers array\n", id);
+        if (index == -1) printf("[PHYSAC] cannot find body id %i in pointers array\n", id);
         #endif
 
         // Free body allocated memory
@@ -877,7 +878,7 @@ PHYSACDEF void ResetPhysics(void)
         if (body != NULL)
         {
             PHYSAC_FREE(body);
-            body = NULL;
+            bodies[i] = NULL;
             usedMemory -= sizeof(PhysicsBodyData);
         }
     }
@@ -892,7 +893,7 @@ PHYSACDEF void ResetPhysics(void)
         if (manifold != NULL)
         {
             PHYSAC_FREE(manifold);
-            manifold = NULL;
+            contacts[i] = NULL;
             usedMemory -= sizeof(PhysicsManifoldData);
         }
     }
@@ -1088,8 +1089,7 @@ static void PhysicsStep(void)
                 {
                     if ((bodyA->inverseMass == 0) && (bodyB->inverseMass == 0)) continue;
 
-                    PhysicsManifold manifold = NULL;
-                    manifold = CreatePhysicsManifold(bodyA, bodyB);
+                    PhysicsManifold manifold = CreatePhysicsManifold(bodyA, bodyB);
                     SolvePhysicsManifold(manifold);
 
                     if (manifold->contactsCount > 0)
@@ -1298,6 +1298,8 @@ static void SolveCircleToCircle(PhysicsManifold manifold)
     PhysicsBody bodyA = manifold->bodyA;
     PhysicsBody bodyB = manifold->bodyB;
 
+    if ((bodyA == NULL) || (bodyB == NULL)) return;
+
     // Calculate translational vector, which is normal
     Vector2 normal = Vector2Subtract(bodyB->position, bodyA->position);
 
@@ -1336,6 +1338,8 @@ static void SolveCircleToPolygon(PhysicsManifold manifold)
 {
     PhysicsBody bodyA = manifold->bodyA;
     PhysicsBody bodyB = manifold->bodyB;
+
+    if ((bodyA == NULL) || (bodyB == NULL)) return;
 
     manifold->contactsCount = 0;
 
@@ -1428,6 +1432,8 @@ static void SolvePolygonToCircle(PhysicsManifold manifold)
     PhysicsBody bodyA = manifold->bodyA;
     PhysicsBody bodyB = manifold->bodyB;
 
+    if ((bodyA == NULL) || (bodyB == NULL)) return;
+
     manifold->bodyA = bodyB;
     manifold->bodyB = bodyA;
     SolveCircleToPolygon(manifold);
@@ -1439,6 +1445,8 @@ static void SolvePolygonToCircle(PhysicsManifold manifold)
 // Solves collision between two polygons shape physics bodies
 static void SolvePolygonToPolygon(PhysicsManifold manifold)
 {
+    if ((manifold->bodyA == NULL) || (manifold->bodyB == NULL)) return;
+
     PhysicsShape bodyA = manifold->bodyA->shape;
     PhysicsShape bodyB = manifold->bodyB->shape;
     manifold->contactsCount = 0;
@@ -1536,7 +1544,7 @@ static void SolvePolygonToPolygon(PhysicsManifold manifold)
 // Integrates physics forces into velocity
 static void IntegratePhysicsForces(PhysicsBody body)
 {
-    if (body->inverseMass == 0.0f || !body->enabled) return;
+    if ((body == NULL) || (body->inverseMass == 0.0f) || !body->enabled) return;
 
     body->velocity.x += (body->force.x*body->inverseMass)*(deltaTime/2.0);
     body->velocity.y += (body->force.y*body->inverseMass)*(deltaTime/2.0);
@@ -1555,6 +1563,8 @@ static void InitializePhysicsManifolds(PhysicsManifold manifold)
 {
     PhysicsBody bodyA = manifold->bodyA;
     PhysicsBody bodyB = manifold->bodyB;
+
+    if ((bodyA == NULL) || (bodyB == NULL)) return;
 
     // Calculate average restitution, static and dynamic friction
     manifold->restitution = sqrtf(bodyA->restitution*bodyB->restitution);
@@ -1586,8 +1596,7 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
     PhysicsBody bodyA = manifold->bodyA;
     PhysicsBody bodyB = manifold->bodyB;
 
-    if ((bodyA == NULL) || (bodyB == NULL))
-        return;
+    if ((bodyA == NULL) || (bodyB == NULL)) return;
 
     // Early out and positional correct if both objects have infinite mass
     if (fabs(bodyA->inverseMass + bodyB->inverseMass) <= PHYSAC_EPSILON)
@@ -1685,7 +1694,7 @@ static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 // Integrates physics velocity into position and forces
 static void IntegratePhysicsVelocity(PhysicsBody body)
 {
-    if (!body->enabled) return;
+    if ((body == NULL) ||!body->enabled) return;
 
     body->position.x += body->velocity.x*deltaTime;
     body->position.y += body->velocity.y*deltaTime;
@@ -1701,6 +1710,8 @@ static void CorrectPhysicsPositions(PhysicsManifold manifold)
 {
     PhysicsBody bodyA = manifold->bodyA;
     PhysicsBody bodyB = manifold->bodyB;
+
+    if ((bodyA == NULL) || (bodyB == NULL)) return;
 
     Vector2 correction = { 0.0f, 0.0f };
     correction.x = (max(manifold->penetration - PHYSAC_PENETRATION_ALLOWANCE, 0.0f)/(bodyA->inverseMass + bodyB->inverseMass))*manifold->normal.x*PHYSAC_PENETRATION_CORRECTION;
