@@ -11,7 +11,7 @@
 *       gcc -o $(NAME_PART).exe $(FILE_NAME) -s ..\icon\physac_icon -I. -I../src 
 *           -I../src/external/raylib/src -static -lraylib -lopengl32 -lgdi32 -pthread -std=c99
 *   
-*   Copyright (c) 2016-2018 Victor Fisac (github: @victorfisac)
+*   Copyright (c) 2016-2020 Victor Fisac (github: @victorfisac)
 *
 ********************************************************************************************/
 
@@ -28,7 +28,7 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics restitution");
+    InitWindow(screenWidth, screenHeight, "[physac] - Restitution demo");
 
     // Physac logo drawing position
     int logoX = screenWidth - MeasureText("Physac", 30) - 10;
@@ -44,11 +44,11 @@ int main()
 
     // Create circles physics body
     PhysicsBody circleA = CreatePhysicsBodyCircle((Vector2){ screenWidth*0.25f, screenHeight/2 }, 30, 10);
-    circleA->restitution = 0;
+    circleA->restitution = 0.0f;
     PhysicsBody circleB = CreatePhysicsBodyCircle((Vector2){ screenWidth*0.5f, screenHeight/2 }, 30, 10);
     circleB->restitution = 0.5f;
     PhysicsBody circleC = CreatePhysicsBodyCircle((Vector2){ screenWidth*0.75f, screenHeight/2 }, 30, 10);
-    circleC->restitution = 1;
+    circleC->restitution = 0.9f;
     
     SetTargetFPS(60);
     //--------------------------------------------------------------------------------------
@@ -58,16 +58,7 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyPressed('R'))    // Reset physics input
-        {
-            // Reset circles physics bodies position and velocity
-            circleA->position = (Vector2){ screenWidth*0.25f, screenHeight/2 };
-            circleA->velocity = (Vector2){ 0, 0 };
-            circleB->position = (Vector2){ screenWidth*0.5f, screenHeight/2 };
-            circleB->velocity = (Vector2){ 0, 0 };
-            circleC->position = (Vector2){ screenWidth*0.75f, screenHeight/2 };
-            circleC->velocity = (Vector2){ 0, 0 };
-        }
+        // ...
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -99,11 +90,9 @@ int main()
             }
 
             DrawText("Restitution amount", (screenWidth - MeasureText("Restitution amount", 30))/2, 75, 30, WHITE);
-            DrawText("0", circleA->position.x - MeasureText("0", 20)/2, circleA->position.y - 7, 20, WHITE);
-            DrawText("0.5", circleB->position.x - MeasureText("0.5", 20)/2, circleB->position.y - 7, 20, WHITE);
-            DrawText("1", circleC->position.x - MeasureText("1", 20)/2, circleC->position.y - 7, 20, WHITE);
-
-            DrawText("Press 'R' to reset example", 10, 10, 10, WHITE);
+            DrawText("0%", circleA->position.x - MeasureText("0%", 20)/2, circleA->position.y - 7, 20, WHITE);
+            DrawText("50%", circleB->position.x - MeasureText("50%", 20)/2, circleB->position.y - 7, 20, WHITE);
+            DrawText("90%", circleC->position.x - MeasureText("90%", 20)/2, circleC->position.y - 7, 20, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);
@@ -121,4 +110,3 @@ int main()
 
     return 0;
 }
-

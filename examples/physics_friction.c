@@ -11,7 +11,7 @@
 *       gcc -o $(NAME_PART).exe $(FILE_NAME) -s ..\icon\physac_icon -I. -I../src 
 *           -I../src/external/raylib/src -static -lraylib -lopengl32 -lgdi32 -pthread -std=c99
 *   
-*   Copyright (c) 2016-2018 Victor Fisac (github: @victorfisac)
+*   Copyright (c) 2016-2020 Victor Fisac (github: @victorfisac)
 *
 ********************************************************************************************/
 
@@ -28,7 +28,7 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics friction");
+    InitWindow(screenWidth, screenHeight, "[physac] Friction demo");
 
     // Physac logo drawing position
     int logoX = screenWidth - MeasureText("Physac", 30) - 10;
@@ -72,19 +72,7 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyPressed('R'))    // Reset physics input
-        {
-            // Reset dynamic physics bodies position, velocity and rotation
-            bodyA->position = (Vector2){ 35, screenHeight*0.6f };
-            bodyA->velocity = (Vector2){ 0, 0 };
-            bodyA->angularVelocity = 0;
-            SetPhysicsBodyRotation(bodyA, 30*DEG2RAD);
-            
-            bodyB->position = (Vector2){ screenWidth - 35, screenHeight*0.6f };
-            bodyB->velocity = (Vector2){ 0, 0 };
-            bodyB->angularVelocity = 0;
-            SetPhysicsBodyRotation(bodyB, 330*DEG2RAD);
-        }
+        // ...
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -124,8 +112,6 @@ int main()
             DrawText("0.1", bodyA->position.x - MeasureText("0.1", 20)/2, bodyA->position.y - 7, 20, WHITE);
             DrawText("1", bodyB->position.x - MeasureText("1", 20)/2, bodyB->position.y - 7, 20, WHITE);
 
-            DrawText("Press 'R' to reset example", 10, 10, 10, WHITE);
-
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);
 
@@ -142,4 +128,3 @@ int main()
 
     return 0;
 }
-
