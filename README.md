@@ -1,7 +1,6 @@
 <img src="https://github.com/victorfisac/Physac/blob/master/icon/physac_256x256.png">
 
 # Physac
-_Created by Víctor Fisac [www.victorfisac.com]_
 
 Physac is a small 2D physics engine written in pure C. The engine uses a fixed time-step thread loop to simluate physics.
 A physics step contains the following phases: get collision information, apply dynamics, collision solving and position correction. It uses a very simple struct for physic bodies with a position vector to be used in any 3D rendering API.
@@ -45,11 +44,14 @@ typedef struct *PhysicsBody {
 The header contains a few customizable define values. I set the values that gived me the best results.
 
 ```c
-#define     DESIRED_DELTATIME               1.0/60.0
-#define     MAX_TIMESTEP                    0.02
-#define     COLLISION_ITERATIONS            100
-#define     PENETRATION_ALLOWANCE           0.05f
-#define     PENETRATION_CORRECTION          0.4f
+#define     PHYSAC_MAX_BODIES               64
+#define     PHYSAC_MAX_MANIFOLDS            4096
+#define     PHYSAC_MAX_VERTICES             24
+#define     PHYSAC_CIRCLE_VERTICES          24
+
+#define     PHYSAC_COLLISION_ITERATIONS     100
+#define     PHYSAC_PENETRATION_ALLOWANCE    0.05f
+#define     PHYSAC_PENETRATION_CORRECTION   0.4f
 ```
 
 Physac contains defines for memory management functions (malloc, free) to bring the user the opportunity to implement its own memory functions:
@@ -109,9 +111,6 @@ void SetPhysicsBodyRotation(PhysicsBody body, float radians);
 
 // Unitializes and destroy a physics body
 void DestroyPhysicsBody(PhysicsBody body);
-
-// Destroys created physics bodies and manifolds and resets global values
-void ResetPhysics(void);
 
 // Unitializes physics pointers and closes physics loop thread
 void ClosePhysics(void);
