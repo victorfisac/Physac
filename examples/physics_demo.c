@@ -11,7 +11,7 @@
 *       gcc -o $(NAME_PART).exe $(FILE_NAME) -s ..\icon\physac_icon -I. -I../src 
 *           -I../src/external/raylib/src -static -lraylib -lopengl32 -lgdi32 -pthread -std=c99
 *   
-*   Copyright (c) 2016-2018 Victor Fisac (github: @victorfisac)
+*   Copyright (c) 2016-2020 Victor Fisac (github: @victorfisac)
 *
 ********************************************************************************************/
 
@@ -28,7 +28,7 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics demo");
+    InitWindow(screenWidth, screenHeight, "[physac] Basic demo");
 
     // Physac logo drawing position
     int logoX = screenWidth - MeasureText("Physac", 30) - 10;
@@ -53,27 +53,20 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyPressed('R'))    // Reset physics input
-        {
-            ResetPhysics();
-
-            floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, 500, 100, 10);
-            floor->enabled = false;
-
-            circle = CreatePhysicsBodyCircle((Vector2){ screenWidth/2, screenHeight/2 }, 45, 10);
-            circle->enabled = false;
-        }
-
         // Physics body creation inputs
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, 8), 10);
-        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) CreatePhysicsBodyCircle(GetMousePosition(), GetRandomValue(10, 45), 10);
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            CreatePhysicsBodyPolygon(GetMousePosition(), GetRandomValue(20, 80), GetRandomValue(3, 8), 10);
+        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
+            CreatePhysicsBodyCircle(GetMousePosition(), GetRandomValue(10, 45), 10);
 
         // Destroy falling physics bodies
         int bodiesCount = GetPhysicsBodiesCount();
         for (int i = bodiesCount - 1; i >= 0; i--)
         {
             PhysicsBody body = GetPhysicsBody(i);
-            if (body != NULL && (body->position.y > screenHeight*2)) DestroyPhysicsBody(body);
+            
+            if ((body != NULL) && (body->position.y > screenHeight*2))
+                DestroyPhysicsBody(body);
         }
         //----------------------------------------------------------------------------------
 
@@ -110,7 +103,6 @@ int main()
 
             DrawText("Left mouse button to create a polygon", 10, 10, 10, WHITE);
             DrawText("Right mouse button to create a circle", 10, 25, 10, WHITE);
-            DrawText("Press 'R' to reset example", 10, 40, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);
@@ -128,4 +120,3 @@ int main()
 
     return 0;
 }
-

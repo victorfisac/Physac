@@ -11,7 +11,7 @@
 *       gcc -o $(NAME_PART).exe $(FILE_NAME) -s ..\icon\physac_icon -I. -I../src 
 *           -I../src/external/raylib/src -static -lraylib -lopengl32 -lgdi32 -pthread -std=c99
 *   
-*   Copyright (c) 2016-2018 Victor Fisac (github: @victorfisac)
+*   Copyright (c) 2016-2020 Victor Fisac (github: @victorfisac)
 *
 ********************************************************************************************/
 
@@ -30,7 +30,7 @@ int main()
     int screenHeight = 450;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Physac [raylib] - Physics movement");
+    InitWindow(screenWidth, screenHeight, "[physac] - Body controller demo");
 
     // Physac logo drawing position
     int logoX = screenWidth - MeasureText("Physac", 30) - 10;
@@ -65,20 +65,15 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyPressed('R'))    // Reset physics input
-        {
-            // Reset movement physics body position, velocity and rotation
-            body->position = (Vector2){ screenWidth/2, screenHeight/2 };
-            body->velocity = (Vector2){ 0, 0 };
-            SetPhysicsBodyRotation(body, 0);
-        }
-
         // Horizontal movement input
-        if (IsKeyDown(KEY_RIGHT)) body->velocity.x = VELOCITY;
-        else if (IsKeyDown(KEY_LEFT)) body->velocity.x = -VELOCITY;
+        if (IsKeyDown(KEY_RIGHT))
+            body->velocity.x = VELOCITY;
+        else if (IsKeyDown(KEY_LEFT))
+            body->velocity.x = -VELOCITY;
 
         // Vertical movement input checking if player physics body is grounded
-        if (IsKeyDown(KEY_UP) && body->isGrounded) body->velocity.y = -VELOCITY*4;
+        if (IsKeyDown(KEY_UP) && body->isGrounded)
+            body->velocity.y = -VELOCITY*4;
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -110,7 +105,6 @@ int main()
             }
 
             DrawText("Use 'ARROWS' to move player", 10, 10, 10, WHITE);
-            DrawText("Press 'R' to reset example", 10, 30, 10, WHITE);
 
             DrawText("Physac", logoX, logoY, 30, WHITE);
             DrawText("Powered by", logoX + 50, logoY - 7, 10, WHITE);
@@ -128,4 +122,3 @@ int main()
 
     return 0;
 }
-
