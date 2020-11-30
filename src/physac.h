@@ -779,13 +779,9 @@ PHYSACDEF int GetPhysicsBodiesCount(void)
 // Returns a physics body of the bodies pool at a specific index
 PHYSACDEF PhysicsBody GetPhysicsBody(int index)
 {
-    PhysicsBody body = NULL;
-
     if (index < physicsBodiesCount)
     {
-        body = bodies[index];
-
-        if (body == NULL)
+        if (bodies[index] == NULL)
         {
             #if defined(PHYSAC_DEBUG)
                 printf("[PHYSAC] error when trying to get a null reference physics body");
@@ -797,7 +793,7 @@ PHYSACDEF PhysicsBody GetPhysicsBody(int index)
             printf("[PHYSAC] physics body index is out of bounds");
     #endif
 
-    return body;
+    return bodies[index];
 }
 
 // Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON)
@@ -807,10 +803,8 @@ PHYSACDEF int GetPhysicsShapeType(int index)
 
     if (index < physicsBodiesCount)
     {
-        PhysicsBody body = bodies[index];
-
-        if (body != NULL) 
-            result = body->shape.type;
+        if (bodies[index] != NULL) 
+            result = bodies[index]->shape.type;
 
         #if defined(PHYSAC_DEBUG)
             else
@@ -832,14 +826,12 @@ PHYSACDEF int GetPhysicsShapeVerticesCount(int index)
 
     if (index < physicsBodiesCount)
     {
-        PhysicsBody body = bodies[index];
-
-        if (body != NULL)
+        if (bodies[index] != NULL)
         {
-            switch (body->shape.type)
+            switch (bodies[index]->shape.type)
             {
                 case PHYSICS_CIRCLE: result = PHYSAC_CIRCLE_VERTICES; break;
-                case PHYSICS_POLYGON: result = body->shape.vertexData.vertexCount; break;
+                case PHYSICS_POLYGON: result = bodies[index]->shape.vertexData.vertexCount; break;
                 default: break;
             }
         }
