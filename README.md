@@ -12,7 +12,7 @@ _Note: The example code uses raylib programming library to create the program wi
 Installation
 -----
 
-rPBR requires raylib. To get it, follow the next steps:
+Physac requires raylib. To get it, follow the next steps:
 
     * Go to [raylib](https://www.github.com/raysan5/raylib) and clone the repository.
     * Ensure to pull the last changes of 'master' branch.
