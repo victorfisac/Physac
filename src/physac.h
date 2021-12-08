@@ -654,7 +654,7 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
 
                 float gamma = 1.0f - alpha - beta;
 
-                if ((alpha > 0.0f) && (beta > 0.0f) & (gamma > 0.0f))
+                if ((alpha > 0.0f) && (beta > 0.0f) && (gamma > 0.0f))
                 {
                     collision = true;
                     break;
