@@ -1155,7 +1155,7 @@ static void PhysicsStep(void)
     {
         for (int j = 0; j < physicsManifoldsCount; j++)
         {
-            PhysicsManifold manifold = contacts[i];
+            PhysicsManifold manifold = contacts[j];
             
             if (manifold != NULL)
                 IntegratePhysicsImpulses(manifold);
