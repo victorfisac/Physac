@@ -252,17 +252,7 @@ PHYSACDEF void ClosePhysics(void);                                              
 
 // Time management functionality
 #include <time.h>                   // Required for: time(), clock_gettime()
-#if defined(_WIN32)
-    // Functions required to query time on Windows
-    #if defined(__cplusplus)
-    extern "C" {                                    // Prevents name mangling of functions
-    #endif
-    int __stdcall QueryPerformanceCounter(unsigned long long int* lpPerformanceCount);
-    int __stdcall QueryPerformanceFrequency(unsigned long long int* lpFrequency);
-    #if defined(__cplusplus)
-    }
-    #endif
-#elif defined(__linux__)
+#if defined(__linux__)
     #if _POSIX_C_SOURCE < 199309L
         #undef _POSIX_C_SOURCE
         #define _POSIX_C_SOURCE 199309L // Required for CLOCK_MONOTONIC if compiled with c99 without gnu ext.
@@ -337,7 +327,7 @@ static Vector2 TriangleBarycenter(Vector2 v1, Vector2 v2, Vector2 v3);          
 
 static void InitTimer(void);                                                                                // Initializes hi-resolution MONOTONIC timer
 static uint64_t GetTimeCount(void);                                                                         // Get hi-res MONOTONIC time measure in mseconds
-static double GetCurrentTime(void);                                                                         // Get current time measure in milliseconds
+static double GetCurrTime(void);                                                                         // Get current time measure in milliseconds
 
 // Math functions
 static Vector2 MathCross(float value, Vector2 vector);                                                      // Returns the cross product of a vector and a value
@@ -1197,7 +1187,7 @@ static void PhysicsStep(void)
 PHYSACDEF void RunPhysicsStep(void)
 {
     // Calculate current time
-    currentTime = GetCurrentTime();
+    currentTime = GetCurrTime();
 
     // Calculate current delta time
     const double delta = currentTime - startTime;
@@ -2020,7 +2010,7 @@ static void InitTimer(void)
     #endif
 
     baseTime = GetTimeCount();      // Get MONOTONIC clock time offset
-    startTime = GetCurrentTime();   // Get current time
+    startTime = GetCurrTime();   // Get current time
 }
 
 // Get hi-res MONOTONIC time measure in seconds
@@ -2050,7 +2040,7 @@ static uint64_t GetTimeCount(void)
 }
 
 // Get current time in milliseconds
-static double GetCurrentTime(void)
+static double GetCurrTime(void)
 {
     return (double)(GetTimeCount() - baseTime)/frequency*1000;
 }
