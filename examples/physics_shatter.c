@@ -18,7 +18,7 @@
 #include "raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-#include "physac.h"
+#include "../src/physac.h"
 
 #define SHATTER_FORCE 200.0f
 

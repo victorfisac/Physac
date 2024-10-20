@@ -18,7 +18,7 @@
 #include "raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-#include "physac.h"
+#include "../src/physac.h"
 
 int main()
 {
@@ -40,7 +40,7 @@ int main()
     // Create floor rectangle physics body
     PhysicsBody floor = CreatePhysicsBodyRectangle((Vector2){ screenWidth/2, screenHeight }, screenWidth, 100, 10);
     floor->enabled = false; // Disable body state to convert it to static (no dynamics, but collisions)
-    floor->restitution = 1;
+    floor->restitution = 0.9f;
 
     // Create circles physics body
     PhysicsBody circleA = CreatePhysicsBodyCircle((Vector2){ screenWidth*0.25f, screenHeight/2 }, 30, 10);

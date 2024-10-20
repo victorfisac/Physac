@@ -18,7 +18,7 @@
 #include "raylib.h"
 
 #define PHYSAC_IMPLEMENTATION
-#include "physac.h"
+#include "../src/physac.h"
 
 #define VELOCITY    0.5f
 

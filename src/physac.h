@@ -104,7 +104,7 @@
 #define     PHYSAC_CIRCLE_VERTICES          24
 
 #define     PHYSAC_FIXED_TIME               1.0f/60.0f
-#define     PHYSAC_COLLISION_ITERATIONS     1
+#define     PHYSAC_COLLISION_ITERATIONS     20
 #define     PHYSAC_PENETRATION_ALLOWANCE    0.05f
 #define     PHYSAC_PENETRATION_CORRECTION   0.4f
 
@@ -1221,30 +1221,14 @@ PHYSACDEF void SetPhysicsTimeStep(double delta)
 // Finds a valid index for a new manifold initialization
 static int FindAvailableManifoldIndex()
 {
-    int index = -1;
-    for (int i = 0; i < PHYSAC_MAX_MANIFOLDS; i++)
+    int id = physicsManifoldsCount + 1;
+
+    if (id >= PHYSAC_MAX_MANIFOLDS)
     {
-        int currentId = i;
-
-        // Check if current id already exist in other physics body
-        for (int k = 0; k < physicsManifoldsCount; k++)
-        {
-            if (contacts[k]->id == currentId)
-            {
-                currentId++;
-                break;
-            }
-        }
-
-        // If it is not used, use it as new physics body id
-        if (currentId == i)
-        {
-            index = i;
-            break;
-        }
+        return -1;
     }
 
-    return index;
+    return id;
 }
 
 // Creates a new physics manifold to solve collision
