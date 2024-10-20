@@ -11,7 +11,7 @@
 *       gcc -o $(NAME_PART).exe $(FILE_NAME) -s ..\icon\physac_icon -I. -I../src 
 *           -I../src/external/raylib/src -static -lraylib -lopengl32 -lgdi32 -pthread -std=c99
 *   
-*   Copyright (c) 2016-2025 Victor Fisac (github: @victorfisac)
+*   Copyright (c) 2016-2020 Victor Fisac (github: @victorfisac)
 *
 ********************************************************************************************/
 
@@ -52,16 +52,28 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (!shatter && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        if (IsKeyPressed(KEY_R))
         {
-            shatter = true;
+            ClosePhysics();
 
-            // Shatter the body
-            if (shatterBody != NULL) 
+            InitPhysics();
+            SetPhysicsGravity(0, 0);
+
+            CreatePhysicsBodyPolygon((Vector2){ screenWidth/2, screenHeight/2 }, GetRandomValue(80, 200), GetRandomValue(3, 8), 10);
+        }
+        else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            // Note: some values need to be stored in variables due to asynchronous changes during main thread
+            int count = GetPhysicsBodiesCount();
+            
+            for (int i = count - 1; i >= 0; i--)
             {
-                PhysicsShatter(shatterBody, GetMousePosition(), SHATTER_FORCE);
-                // Consider destroying the body if it's no longer needed
-                // DestroyPhysicsBody(shatterBody); // Uncomment if you want to destroy it after shattering
+                PhysicsBody currentBody = GetPhysicsBody(i);
+                
+                if (currentBody != NULL)
+                {
+                    PhysicsShatter(currentBody, GetMousePosition(), SHATTER_FORCE);
+                }
             }
         }
         //----------------------------------------------------------------------------------
@@ -74,15 +86,16 @@ int main()
 
             // Draw created physics bodies
             int bodiesCount = GetPhysicsBodiesCount();
+
             for (int i = 0; i < bodiesCount; i++)
             {
                 PhysicsBody currentBody = GetPhysicsBody(i);
 
-                 // Check if the body is valid
+                // Check if the body is valid
                 if (currentBody != NULL)
                 {
                     int vertexCount = GetPhysicsShapeVerticesCount(i);
-                    
+
                     for (int j = 0; j < vertexCount; j++)
                     {
                         // Get physics bodies shape vertices to draw lines
