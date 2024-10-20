@@ -58,7 +58,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2016-2020 Victor Fisac (github: @victorfisac)
+*   Copyright (c) 2016-2025 Victor Fisac (github: @victorfisac)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -103,7 +103,8 @@
 #define     PHYSAC_MAX_VERTICES             24
 #define     PHYSAC_CIRCLE_VERTICES          24
 
-#define     PHYSAC_COLLISION_ITERATIONS     100
+#define     PHYSAC_FIXED_TIME               1.0f/60.0f
+#define     PHYSAC_COLLISION_ITERATIONS     1
 #define     PHYSAC_PENETRATION_ALLOWANCE    0.05f
 #define     PHYSAC_PENETRATION_CORRECTION   0.4f
 
@@ -1058,9 +1059,15 @@ static void *PhysicsLoop(void *arg)
     while (physicsThreadEnabled)
     {
         RunPhysicsStep();
+
+        struct timespec req = { 0 };
+        req.tv_sec = 0;
+        req.tv_nsec = PHYSAC_FIXED_TIME*1000*1000;
+
+        nanosleep(&req, NULL);
     }
 
-    return NULL;
+    return 0;
 }
 
 // Physics steps calculations (dynamics, collisions and position corrections)
@@ -1190,7 +1197,7 @@ PHYSACDEF void RunPhysicsStep(void)
     currentTime = GetCurrTime();
 
     // Calculate current delta time
-    const double delta = currentTime - startTime;
+    double delta = currentTime - startTime;
 
     // Store the time elapsed since the last frame began
     accumulator += delta;
