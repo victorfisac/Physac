@@ -661,7 +661,7 @@ PHYSACDEF void PhysicsShatter(PhysicsBody body, Vector2 position, float force)
                 Vector2 bodyPos = body->position;
                 Vector2 *vertices = (Vector2*)PHYSAC_MALLOC(sizeof(Vector2) * count);
                 Mat2 trans = body->shape.transform;
-
+                
                 for (int i = 0; i < count; i++)
                     vertices[i] = vertexData.positions[i];
 
@@ -797,7 +797,7 @@ PHYSACDEF int GetPhysicsShapeType(int index)
 
     if (index < physicsBodiesCount)
     {
-        if (bodies[index] != NULL)
+        if (bodies[index] != NULL) 
             result = bodies[index]->shape.type;
 
         #if defined(PHYSAC_DEBUG)
@@ -1080,7 +1080,7 @@ static void PhysicsStep(void)
     for (int i = physicsManifoldsCount - 1; i >= 0; i--)
     {
         PhysicsManifold manifold = contacts[i];
-
+        
         if (manifold != NULL)
             DestroyPhysicsManifold(manifold);
     }
@@ -1133,7 +1133,7 @@ static void PhysicsStep(void)
     for (int i = 0; i < physicsBodiesCount; i++)
     {
         PhysicsBody body = bodies[i];
-
+        
         if (body != NULL)
             IntegratePhysicsForces(body);
     }
@@ -1142,7 +1142,7 @@ static void PhysicsStep(void)
     for (int i = 0; i < physicsManifoldsCount; i++)
     {
         PhysicsManifold manifold = contacts[i];
-
+        
         if (manifold != NULL)
             InitializePhysicsManifolds(manifold);
     }
@@ -1153,7 +1153,7 @@ static void PhysicsStep(void)
         for (int j = 0; j < physicsManifoldsCount; j++)
         {
             PhysicsManifold manifold = contacts[j];
-
+            
             if (manifold != NULL)
                 IntegratePhysicsImpulses(manifold);
         }
@@ -1163,7 +1163,7 @@ static void PhysicsStep(void)
     for (int i = 0; i < physicsBodiesCount; i++)
     {
         PhysicsBody body = bodies[i];
-
+        
         if (body != NULL)
             IntegratePhysicsVelocity(body);
     }
@@ -1172,7 +1172,7 @@ static void PhysicsStep(void)
     for (int i = 0; i < physicsManifoldsCount; i++)
     {
         PhysicsManifold manifold = contacts[i];
-
+        
         if (manifold != NULL)
             CorrectPhysicsPositions(manifold);
     }
@@ -1181,7 +1181,7 @@ static void PhysicsStep(void)
     for (int i = 0; i < physicsBodiesCount; i++)
     {
         PhysicsBody body = bodies[i];
-
+        
         if (body != NULL)
         {
             body->force = PHYSAC_VECTOR_ZERO;
@@ -1288,7 +1288,7 @@ static void DestroyPhysicsManifold(PhysicsManifold manifold)
                 printf("[PHYSAC] Not possible to manifold id %i in pointers array\n", id);
             #endif
             return;
-        }
+        }      
 
         // Free manifold allocated memory
         PHYSAC_FREE(manifold);
@@ -1407,7 +1407,7 @@ static void SolvePolygonToCircle(PhysicsManifold manifold)
         return;
 
     SolveDifferentShapes(manifold, bodyB, bodyA);
-
+    
     manifold->normal.x *= -1.0f;
     manifold->normal.y *= -1.0f;
 }
@@ -1517,14 +1517,14 @@ static void SolvePolygonToPolygon(PhysicsManifold manifold)
     // Check for separating axis with A shape's face planes
     int faceA = 0;
     float penetrationA = FindAxisLeastPenetration(&faceA, bodyA, bodyB);
-
+    
     if (penetrationA >= 0.0f)
         return;
 
     // Check for separating axis with B shape's face planes
     int faceB = 0;
     float penetrationB = FindAxisLeastPenetration(&faceB, bodyB, bodyA);
-
+    
     if (penetrationB >= 0.0f)
         return;
 
@@ -1588,7 +1588,7 @@ static void SolvePolygonToPolygon(PhysicsManifold manifold)
     // Keep points behind reference face
     int currentPoint = 0; // Clipped points behind reference face
     float separation = MathDot(refFaceNormal, incidentFace[0]) - refC;
-
+    
     if (separation <= 0.0f)
     {
         manifold->contacts[currentPoint] = incidentFace[0];
@@ -1669,32 +1669,112 @@ static void InitializePhysicsManifolds(PhysicsManifold manifold)
 // Integrates physics collisions impulses to solve collisions
 static void IntegratePhysicsImpulses(PhysicsManifold manifold)
 {
-    PhysicsBody a = manifold->bodyA;
-    PhysicsBody b = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
-    for (unsigned int i = 0; i < manifold->contactsCount; i++)
+    if ((bodyA == NULL) || (bodyB == NULL))
+        return;
+
+    // Early out and positional correct if both objects have infinite mass
+    if (fabs(bodyA->inverseMass + bodyB->inverseMass) <= PHYSAC_EPSILON)
     {
-        // Calculate relative velocity
-        Vector2 rv = Vector2Subtract(Vector2Add(b->velocity, MathCross(b->angularVelocity, manifold->contacts[i])),
-                                     Vector2Add(a->velocity, MathCross(a->angularVelocity, manifold->contacts[i])));
+        bodyA->velocity = PHYSAC_VECTOR_ZERO;
+        bodyB->velocity = PHYSAC_VECTOR_ZERO;
+        return;
+    }
 
-        // Calculate relative velocity in terms of the normal direction
-        float contactVel = MathDot(rv, manifold->normal);
+    for (int i = 0; i < manifold->contactsCount; i++)
+    {
+        // Calculate radius from center of mass to contact
+        Vector2 radiusA = Vector2Subtract(manifold->contacts[i], bodyA->position);
+        Vector2 radiusB = Vector2Subtract(manifold->contacts[i], bodyB->position);
+
+        // Calculate relative velocity
+        Vector2 radiusV = { 0.0f, 0.0f };
+        radiusV.x = bodyB->velocity.x + MathCross(bodyB->angularVelocity, radiusB).x - bodyA->velocity.x - MathCross(bodyA->angularVelocity, radiusA).x;
+        radiusV.y = bodyB->velocity.y + MathCross(bodyB->angularVelocity, radiusB).y - bodyA->velocity.y - MathCross(bodyA->angularVelocity, radiusA).y;
+
+        // Relative velocity along the normal
+        float contactVelocity = MathDot(radiusV, manifold->normal);
 
         // Do not resolve if velocities are separating
-        if (contactVel > 0) return;
+        if (contactVelocity > 0.0f)
+            return;
 
-        // Calculate restitution
-        float e = min(a->restitution, b->restitution);
+        float raCrossN = MathCrossVector2(radiusA, manifold->normal);
+        float rbCrossN = MathCrossVector2(radiusB, manifold->normal);
 
-        // Calculate impulse scalar
-        float j = -(1.0f + e) * contactVel;
-        j /= manifold->bodyA->inverseMass + manifold->bodyB->inverseMass;
+        float inverseMassSum = bodyA->inverseMass + bodyB->inverseMass + (raCrossN*raCrossN)*bodyA->inverseInertia + (rbCrossN*rbCrossN)*bodyB->inverseInertia;
 
-        // Apply impulse
-        Vector2 impulse = MathCross(j, manifold->normal);
-        a->velocity = Vector2Subtract(a->velocity, Vector2Scale(impulse, a->inverseMass));
-        b->velocity = Vector2Add(b->velocity, Vector2Scale(impulse, b->inverseMass));
+        // Calculate impulse scalar value
+        float impulse = -(1.0f + manifold->restitution)*contactVelocity;
+        impulse /= inverseMassSum;
+        impulse /= (float)manifold->contactsCount;
+
+        // Apply impulse to each physics body
+        Vector2 impulseV = { manifold->normal.x*impulse, manifold->normal.y*impulse };
+
+        if (bodyA->enabled)
+        {
+            bodyA->velocity.x += bodyA->inverseMass*(-impulseV.x);
+            bodyA->velocity.y += bodyA->inverseMass*(-impulseV.y);
+            
+            if (!bodyA->freezeOrient)
+                bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -impulseV.x, -impulseV.y });
+        }
+
+        if (bodyB->enabled)
+        {
+            bodyB->velocity.x += bodyB->inverseMass*(impulseV.x);
+            bodyB->velocity.y += bodyB->inverseMass*(impulseV.y);
+            
+            if (!bodyB->freezeOrient)
+                bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, impulseV);
+        }
+
+        // Apply friction impulse to each physics body
+        radiusV.x = bodyB->velocity.x + MathCross(bodyB->angularVelocity, radiusB).x - bodyA->velocity.x - MathCross(bodyA->angularVelocity, radiusA).x;
+        radiusV.y = bodyB->velocity.y + MathCross(bodyB->angularVelocity, radiusB).y - bodyA->velocity.y - MathCross(bodyA->angularVelocity, radiusA).y;
+
+        Vector2 tangent = { radiusV.x - (manifold->normal.x*MathDot(radiusV, manifold->normal)), radiusV.y - (manifold->normal.y*MathDot(radiusV, manifold->normal)) };
+        MathNormalize(&tangent);
+
+        // Calculate impulse tangent magnitude
+        float impulseTangent = -MathDot(radiusV, tangent);
+        impulseTangent /= inverseMassSum;
+        impulseTangent /= (float)manifold->contactsCount;
+
+        float absImpulseTangent = fabs(impulseTangent);
+
+        // Don't apply tiny friction impulses
+        if (absImpulseTangent <= PHYSAC_EPSILON)
+            return;
+
+        // Apply coulumb's law
+        Vector2 tangentImpulse = { 0.0f, 0.0f };
+        if (absImpulseTangent < impulse*manifold->staticFriction)
+            tangentImpulse = (Vector2){ tangent.x*impulseTangent, tangent.y*impulseTangent };
+        else
+            tangentImpulse = (Vector2){ tangent.x*-impulse*manifold->dynamicFriction, tangent.y*-impulse*manifold->dynamicFriction };
+
+        // Apply friction impulse
+        if (bodyA->enabled)
+        {
+            bodyA->velocity.x += bodyA->inverseMass*(-tangentImpulse.x);
+            bodyA->velocity.y += bodyA->inverseMass*(-tangentImpulse.y);
+
+            if (!bodyA->freezeOrient)
+                bodyA->angularVelocity += bodyA->inverseInertia*MathCrossVector2(radiusA, (Vector2){ -tangentImpulse.x, -tangentImpulse.y });
+        }
+
+        if (bodyB->enabled)
+        {
+            bodyB->velocity.x += bodyB->inverseMass*(tangentImpulse.x);
+            bodyB->velocity.y += bodyB->inverseMass*(tangentImpulse.y);
+
+            if (!bodyB->freezeOrient)
+                bodyB->angularVelocity += bodyB->inverseInertia*MathCrossVector2(radiusB, tangentImpulse);
+        }
     }
 }
 
@@ -1718,12 +1798,27 @@ static void IntegratePhysicsVelocity(PhysicsBody body)
 // Corrects physics bodies positions based on manifolds collision information
 static void CorrectPhysicsPositions(PhysicsManifold manifold)
 {
-    PhysicsBody a = manifold->bodyA;
-    PhysicsBody b = manifold->bodyB;
+    PhysicsBody bodyA = manifold->bodyA;
+    PhysicsBody bodyB = manifold->bodyB;
 
-    Vector2 correction = Vector2Scale(manifold->normal, (max(manifold->penetration - PHYSAC_PENETRATION_ALLOWANCE, 0.0f) / (a->inverseMass + b->inverseMass)) * PHYSAC_PENETRATION_CORRECTION);
-    a->position = Vector2Subtract(a->position, Vector2Scale(correction, a->inverseMass));
-    b->position = Vector2Add(b->position, Vector2Scale(correction, b->inverseMass));
+    if ((bodyA == NULL) || (bodyB == NULL))
+        return;
+
+    Vector2 correction = { 0.0f, 0.0f };
+    correction.x = (max(manifold->penetration - PHYSAC_PENETRATION_ALLOWANCE, 0.0f)/(bodyA->inverseMass + bodyB->inverseMass))*manifold->normal.x*PHYSAC_PENETRATION_CORRECTION;
+    correction.y = (max(manifold->penetration - PHYSAC_PENETRATION_ALLOWANCE, 0.0f)/(bodyA->inverseMass + bodyB->inverseMass))*manifold->normal.y*PHYSAC_PENETRATION_CORRECTION;
+
+    if (bodyA->enabled)
+    {
+        bodyA->position.x -= correction.x*bodyA->inverseMass;
+        bodyA->position.y -= correction.y*bodyA->inverseMass;
+    }
+
+    if (bodyB->enabled)
+    {
+        bodyB->position.x += correction.x*bodyB->inverseMass;
+        bodyB->position.y += correction.y*bodyB->inverseMass;
+    }
 }
 
 // Returns the extreme point along a direction within a polygon
