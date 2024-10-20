@@ -11,7 +11,7 @@
 *       gcc -o $(NAME_PART).exe $(FILE_NAME) -s ..\icon\physac_icon -I. -I../src 
 *           -I../src/external/raylib/src -static -lraylib -lopengl32 -lgdi32 -pthread -std=c99
 *   
-*   Copyright (c) 2016-2020 Victor Fisac (github: @victorfisac)
+*   Copyright (c) 2016-2025 Victor Fisac (github: @victorfisac)
 *
 ********************************************************************************************/
 
